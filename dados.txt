@@ -1,0 +1,64 @@
+1. Qual problema você está resolvendo?
+	centralizar e armazenar documentar cadastro do funcionario.
+
+2. Para quem?
+	para que a gestao da empresa ou contabilidade.
+
+3. Como o usuário resolve isso hoje?
+	conversas de whatsapp, documentos.docx e imagens soltas. 
+
+4. Por que a solução atual é ruim?
+	nao tem facilidade de encontrar os dados qundo preciso e nao tem armazenamento.
+
+5. Qual é a proposta de valor única?
+	centralizar a documentação em um so lugar.
+
+6. Quais são as 3 a 5 funcionalidades principais da versão inicial?
+	pagina de login com perfil de conexao diferente para gestores e colaborador.
+		painel do colaborador para atualizar seus dados.
+			armazenamento de  fotos  anexada.
+				exportar  ficha do funcionario para contabilidade
+					cadastro de usuarios e definição de perfil (gestoes e funcionarios)
+						criação de novos  funcionarios, criar setores/cargos de funcionarios.
+
+
+7. O que está fora da versão inicial?
+	ainda nao tenho definido.
+
+8. Quais são as entidades principais do sistema? (Ex: Funcionário, Empresa, Gestor, Contabilidade, Documento)
+	funcionarios, gestores, cargos, documentos.
+
+9. Quais dados e documentos são obrigatórios para a contabilidade (eSocial/CLT)?
+	documentos
+	cpf RG pis CLT. 
+
+10. Haverá validação automática de dados no momento do preenchimento? (Ex: validação de CPF, busca de CEP via ViaCEP)
+	sim realizar  validação de  dados. 
+
+11. Como será o upload e armazenamento dos documentos anexados? (Ex: limite de tamanho, formatos PDF/JPEG)
+	anexar fotos, tamanho maximo de 5 a 10mb
+
+12. Qual é o fluxo/status do cadastro do funcionário? (Ex: Rascunho -> Pendente de Documentos -> Aprovado pelo RH -> Enviado para Contabilidade).
+	sem dados -> Pendente de Documentos -> Aprovado pelo RH -> Enviado para Contabilidade.
+
+13. Quais são os perfis de acesso e permissões na plataforma? (Ex: Gestor/RH cria e edita; Contabilidade visualiza e baixa)
+	GESTOR> cria novos funcionarios e os dados deles, visualiza, baixa, edita e deleta
+	RH> visualiza, baixa
+	FUNCIONARIO> edita os proprios dados e baixa o seus dados.
+
+14. Como os dados serão entregues para a contabilidade na versão inicial? (Ex: exportação ZIP/Excel/PDF ou login direto no painel)
+	RH execulta login seleciona o funcionario e exporta PRF.
+
+15. Quais integrações externas são necessárias?
+	banco de dados, google drive, API CEP   api de validação RG e CPF.
+
+16. Como a aplicação garante a conformidade com a LGPD? (Ex: consentimento, criptografia de dados sensíveis, controle de acesso)
+	consentimento e controle de acesso.
+
+17. Quais são as restrições técnicas ou operacionais?
+	caso possivel usar somente  html CSS e java script.
+
+18. Como é a versão inicial entregue? (Ex: sistema web responsivo)
+	sistema web PWA responsivo com perfil claro e escuro.
+
+

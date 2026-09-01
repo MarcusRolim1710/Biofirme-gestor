@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Biofirm · Painel de Gestão de Funcionários</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+     <script src="js/supabase.js"></script>
+     <script src="js/mask.js" defer></script>
+     <script src="js/compress.js" defer></script>
+     <script src="js/animations.js"></script>
+     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <!-- Cabeçalho Principal -->
+    <header class="app-header">
+      <div class="app-brand">
+        <span class="brand-emblem">Biofirm</span>
+        <span class="brand-role" id="userRole">Gestor</span>
+      </div>
+      <nav class="app-nav">
+        <a href="dashboard.html" class="nav-link active">Funcionários</a>
+        <a href="#cargos" class="nav-link">Cargos & Setores</a>
+        <a href="#relatorios" class="nav-link">Relatórios</a>
+      </nav>
+      <div class="app-user">
+        <div class="user-info">
+          <span class="user-name" id="userName">Usuário</span>
+          <span class="user-tag" id="userAccessTag">Acesso Master</span>
+        </div>
+        <button id="logoutBtn" class="btn-logout" title="Encerrar sessão">Sair</button>
+      </div>
+    </header>
+
+    <!-- Conteúdo Principal -->
+    <main class="app-main">
+      <section class="page-header">
+        <div class="page-title-group">
+          <h1>Quadro de Colaboradores</h1>
+          <p>Gestão centralizada de dados cadastrais, aprovações e documentações da Biofirm</p>
+        </div>
+        <div class="page-actions">
+          <button id="btnOpenModal" class="btn-primary">
+            <span>+</span> Novo Funcionário
+          </button>
+        </div>
+      </section>
+
+      <!-- Layout Assimétrico (2/3 + 1/3) -->
+      <div class="dashboard-grid">
+        <!-- Coluna Principal (2/3) -->
+        <section class="main-column">
+          <div class="card">
+            <!-- Barra de Filtros -->
+            <div class="filters">
+              <div class="filter-search-wrap">
+                <input type="text" id="searchInput" placeholder="Buscar por nome, CPF ou cargo..." class="filter-input">
+              </div>
+              <select id="filterStatus" class="filter-select">
+                <option value="">Todos os Status de Cadastro</option>
+                <option value="Sem dados">Sem dados</option>
+                <option value="Pendente de Documentos">Pendente de Documentos</option>
+                <option value="Aprovado pelo RH">Aprovado pelo RH</option>
+                <option value="Enviado para Contabilidade">Enviado para Contabilidade</option>
+              </select>
+              <select id="filterVinculo" class="filter-select">
+                <option value="">Todos os Vínculos</option>
+                <option value="Ativo">Ativo</option>
+                <option value="Inativo">Inativo</option>
+                <option value="Demitido">Demitido</option>
+              </select>
+            </div>
+
+            <!-- Tabela de Colaboradores -->
+            <div class="table-wrap">
+              <table class="employee-table">
+                <thead>
+                  <tr>
+                    <th>Colaborador</th>
+                    <th>CPF</th>
+                    <th>Cargo / Setor</th>
+                    <th>Fluxo de Cadastro</th>
+                    <th>Vínculo</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="employeeList">
+                  <!-- Carregamento via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Coluna Lateral (1/3) -->
+        <aside class="side-column">
+          <!-- Métricas e Resumo -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Resumo Cadastral</h2>
+            </div>
+            <div class="stats-grid">
+              <div class="stat-item">
+                <div class="stat-label">Total Cadastrado</div>
+                <div class="stat-value" id="statTotal">0</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">Vínculos Ativos</div>
+                <div class="stat-value" id="statAtivos">0</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">Pendentes de Doc.</div>
+                <div class="stat-value" id="statPendentes">0</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">Aprovados / Prontos</div>
+                <div class="stat-value" id="statAprovados">0</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ficha de Detalhe Rápido -->
+          <div class="card" id="detailCard">
+            <div class="card-header">
+              <h2 class="card-title">Detalhes do Colaborador</h2>
+            </div>
+            <div id="detailContent" class="detail-box">
+              <p class="empty-state-text" style="font-size: 13px; color: var(--color-text-muted); text-align: center;">
+                Selecione um funcionário na tabela para visualizar a ficha rápida e exportação.
+              </p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+
+    <!-- Régua Visual Dourada -->
+    <div class="app-ruler"></div>
+  </div>
+
+  <!-- Modal de Criação / Edição de Funcionário -->
+  <div class="modal-backdrop" id="employeeModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modalFormTitle">Novo Colaborador</h2>
+        <button class="modal-close" id="btnCloseModal">&times;</button>
+      </div>
+      <form id="employeeForm">
+        <input type="hidden" id="empId">
+        <div class="form-grid">
+          <!-- Foto de Perfil — escolha Upload ou Câmera -->
+          <div class="field full-width">
+            <label>Foto de Perfil</label>
+            <div style="display:flex; align-items:center; gap:16px;">
+              <div id="fotoPreviewWrap" style="width:72px; height:72px; border-radius:50%; border:2px solid var(--color-gold-light); background:#F0E6CE url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2272%22 height=%2272%22><text x=%2250%%22 y=%2255%%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 font-size=%2228%22 fill=%22%238F7A3A%22>?</text></svg>') center/cover no-repeat; overflow:hidden; flex-shrink:0; cursor:pointer;" title="Clique para alterar foto"></div>
+              <div style="flex:1;">
+                <button type="button" id="btnFotoChoice" class="btn-secondary btn-small" style="width:100%; justify-content:center;">📷 Anexar foto — escolher origem</button>
+                <input type="file" id="empFoto" accept="image/*" style="display:none;">
+                <input type="hidden" id="empFotoUrl">
+                <div id="fotoInfo" style="font-size:11px; color:var(--color-text-muted); margin-top:6px;">JPG/PNG/WebP até 10MB — compressão automática para 1GB</div>
+              </div>
+            </div>
+          </div>
+          <div class="field full-width">
+            <label for="empName">Nome Completo *</label>
+            <input type="text" id="empName" placeholder="Ex: Ana Clara Silva" required>
+          </div>
+          <div class="field">
+            <label for="empCpf">CPF *</label>
+            <input type="text" id="empCpf" data-mask="cpf" placeholder="000.000.000-00" maxlength="14" required>
+          </div>
+          <div class="field">
+            <label for="empRg">RG</label>
+            <input type="text" id="empRg" data-mask="rg" placeholder="00.000.000-00000" maxlength="16">
+          </div>
+          <div class="field">
+            <label for="empCtpsNumero">Carteira de Trabalho (CTPS)</label>
+            <input type="text" id="empCtpsNumero" data-mask="ctps" placeholder="000000/000-0" maxlength="11">
+          </div>
+          <div class="field">
+            <label for="empPis">PIS / PASEP</label>
+            <input type="text" id="empPis" data-mask="pis" placeholder="000.00000.00-0" maxlength="14">
+          </div>
+          <div class="field">
+            <label for="empCargo">Cargo</label>
+            <input type="text" id="empCargo" placeholder="Ex: Farmacêutico(a)">
+          </div>
+          <div class="field">
+            <label for="empSetor">Setor</label>
+            <input type="text" id="empSetor" placeholder="Ex: Laboratório / Produção">
+          </div>
+          <fieldset class="field full-width" style="border: 1px solid var(--color-gold-light); border-radius: 8px; padding: 12px; margin-top: 4px;">
+            <legend style="font-size: 12px; color: var(--color-text-muted); font-weight: 500; padding: 0 8px;">Endereço</legend>
+            <div class="form-grid" style="margin-top: 8px;">
+              <div class="field">
+                <label for="empCep">CEP</label>
+                <input type="text" id="empCep" data-mask="cep" placeholder="00000-000" maxlength="9" autocomplete="off">
+              </div>
+              <div class="field full-width">
+                <label for="empLogradouro">Logradouro</label>
+                <input type="text" id="empLogradouro" placeholder="Rua, Avenida, etc." readonly>
+              </div>
+              <div class="field">
+                <label for="empNumero">Número</label>
+                <input type="text" id="empNumero" placeholder="Ex: 123">
+              </div>
+              <div class="field">
+                <label for="empComplemento">Complemento</label>
+                <input type="text" id="empComplemento" placeholder="Apto, Sala, etc.">
+              </div>
+              <div class="field">
+                <label for="empBairro">Bairro</label>
+                <input type="text" id="empBairro" placeholder="Bairro" readonly>
+              </div>
+              <div class="field">
+                <label for="empCidade">Cidade</label>
+                <input type="text" id="empCidade" placeholder="Cidade" readonly>
+              </div>
+              <div class="field">
+                <label for="empUf">UF</label>
+                <select id="empUf" disabled>
+                  <option value="">Selecione</option>
+                  <option value="AC">AC</option>
+                  <option value="AL">AL</option>
+                  <option value="AP">AP</option>
+                  <option value="AM">AM</option>
+                  <option value="BA">BA</option>
+                  <option value="CE">CE</option>
+                  <option value="DF">DF</option>
+                  <option value="ES">ES</option>
+                  <option value="GO">GO</option>
+                  <option value="MA">MA</option>
+                  <option value="MT">MT</option>
+                  <option value="MS">MS</option>
+                  <option value="MG">MG</option>
+                  <option value="PA">PA</option>
+                  <option value="PB">PB</option>
+                  <option value="PR">PR</option>
+                  <option value="PE">PE</option>
+                  <option value="PI">PI</option>
+                  <option value="RJ">RJ</option>
+                  <option value="RN">RN</option>
+                  <option value="RS">RS</option>
+                  <option value="RO">RO</option>
+                  <option value="RR">RR</option>
+                  <option value="SC">SC</option>
+                  <option value="SP">SP</option>
+                  <option value="SE">SE</option>
+                  <option value="TO">TO</option>
+                </select>
+              </div>
+            </div>
+          </fieldset>
+          <!-- Documentação Anexa (com compressão) -->
+          <fieldset class="field full-width" style="border: 1px solid var(--color-gold-light); border-radius: 8px; padding: 12px; margin-top: 4px;">
+            <legend style="font-size: 12px; color: var(--color-text-muted); font-weight: 500; padding: 0 8px;">Documentação — Anexos (imagem ou PDF, até 10MB cada, compressão automática)</legend>
+            <div class="form-grid" style="margin-top: 8px;">
+              <div class="field">
+                <label for="empRgFrente">RG — Frente *</label>
+                <input type="file" id="empRgFrente" accept="image/*,application/pdf">
+                <span class="file-info" id="infoRgFrente" style="font-size:11px; color:var(--color-text-muted);"></span>
+                <input type="hidden" id="empRgFrenteUrl">
+                <div id="previewRgFrente" style="margin-top:6px; display:none;"><img style="max-width:100%; max-height:120px; border:1px solid var(--color-gold-light);"></div>
+              </div>
+              <div class="field">
+                <label for="empRgVerso">RG — Verso *</label>
+                <input type="file" id="empRgVerso" accept="image/*,application/pdf">
+                <span class="file-info" id="infoRgVerso" style="font-size:11px; color:var(--color-text-muted);"></span>
+                <input type="hidden" id="empRgVersoUrl">
+                <div id="previewRgVerso" style="margin-top:6px; display:none;"><img style="max-width:100%; max-height:120px; border:1px solid var(--color-gold-light);"></div>
+              </div>
+              <div class="field">
+                <label for="empCpfDoc">CPF — Cópia</label>
+                <input type="file" id="empCpfDoc" accept="image/*,application/pdf">
+                <span class="file-info" id="infoCpfDoc" style="font-size:11px; color:var(--color-text-muted);"></span>
+                <input type="hidden" id="empCpfDocUrl">
+                <div id="previewCpfDoc" style="margin-top:6px; display:none;"><img style="max-width:100%; max-height:120px; border:1px solid var(--color-gold-light);"></div>
+              </div>
+              <div class="field">
+                <label for="empCompEnd">Comprovante de Endereço</label>
+                <input type="file" id="empCompEnd" accept="image/*,application/pdf">
+                <span class="file-info" id="infoCompEnd" style="font-size:11px; color:var(--color-text-muted);"></span>
+                <input type="hidden" id="empCompEndUrl">
+                <div id="previewCompEnd" style="margin-top:6px; display:none;"><img style="max-width:100%; max-height:120px; border:1px solid var(--color-gold-light);"></div>
+              </div>
+              <div class="field full-width">
+                <label for="empCtpsDoc">Carteira de Trabalho — Cópia</label>
+                <input type="file" id="empCtpsDoc" accept="image/*,application/pdf">
+                <span class="file-info" id="infoCtpsDoc" style="font-size:11px; color:var(--color-text-muted);"></span>
+                <input type="hidden" id="empCtpsDocUrl">
+                <div id="previewCtpsDoc" style="margin-top:6px; display:none;"><img style="max-width:100%; max-height:120px; border:1px solid var(--color-gold-light);"></div>
+              </div>
+            </div>
+          </fieldset>
+          <div class="field">
+            <label for="empVinculo">Vínculo</label>
+            <select id="empVinculo">
+              <option value="Ativo">Ativo</option>
+              <option value="Inativo">Inativo</option>
+              <option value="Demitido">Demitido</option>
+            </select>
+          </div>
+          <div class="field full-width">
+            <label for="empStatus">Status do Cadastro (Fluxo de Aprovação)</label>
+            <select id="empStatus">
+              <option value="Sem dados">Sem dados</option>
+              <option value="Pendente de Documentos">Pendente de Documentos</option>
+              <option value="Aprovado pelo RH">Aprovado pelo RH</option>
+              <option value="Enviado para Contabilidade">Enviado para Contabilidade</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="btnCancelModal">Cancelar</button>
+          <button type="submit" class="btn-primary" id="btnSaveEmployee">Salvar Cadastro</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal de Visualização de Ficha Cadastral -->
+  <div class="modal-backdrop" id="viewModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">Ficha Cadastral do Colaborador</h2>
+        <button class="modal-close" id="btnCloseViewModal">&times;</button>
+      </div>
+      <div id="viewModalContent">
+        <!-- Renderizado dinamicamente -->
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" id="btnCloseViewBtn">Fechar</button>
+        <button type="button" class="btn-primary" id="btnPrintFichaBtn">Exportar PDF — Ficha Completa</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal escolha foto: Upload vs Câmera -->
+  <div class="modal-backdrop" id="fotoChoiceModal">
+    <div class="modal-card" style="max-width:420px; padding:24px;">
+      <div class="modal-header" style="margin-bottom:16px;">
+        <h2 class="modal-title" style="font-size:18px;">Anexar foto de perfil</h2>
+        <button class="modal-close" id="btnCloseFotoChoice">&times;</button>
+      </div>
+      <div id="fotoChoiceOptions" style="display:flex; flex-direction:column; gap:10px;">
+        <button type="button" class="btn-secondary" id="btnFotoUpload" style="justify-content:center; padding:14px;">📁 Escolher arquivo do dispositivo</button>
+        <button type="button" class="btn-primary" id="btnFotoCamera" style="justify-content:center; padding:14px;">📷 Abrir câmera</button>
+        <p style="font-size:11px; color:var(--color-text-muted); text-align:center;">Imagem será comprimida (WebP 0.72, max 800px) para economizar Storage</p>
+      </div>
+      <div id="fotoCameraArea" style="display:none; flex-direction:column; gap:12px;">
+        <video id="fotoVideo" autoplay playsinline style="width:100%; border-radius:8px; background:#000; max-height:260px; object-fit:cover;"></video>
+        <canvas id="fotoCanvas" style="display:none;"></canvas>
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="btn-secondary" id="btnFotoBack" style="flex:1;">Voltar</button>
+          <button type="button" class="btn-primary" id="btnFotoCapture" style="flex:1;">Capturar</button>
+        </div>
+        <div id="fotoCapturePreview" style="display:none; text-align:center;">
+          <img id="fotoCaptureImg" style="max-width:100%; border-radius:8px; border:1px solid var(--color-gold-light);">
+          <div style="display:flex; gap:8px; margin-top:10px;">
+            <button type="button" class="btn-secondary" id="btnFotoRetake" style="flex:1;">Refazer</button>
+            <button type="button" class="btn-primary" id="btnFotoConfirm" style="flex:1;">Usar esta foto</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

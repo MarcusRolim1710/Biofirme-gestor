@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Biofirm · Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Inter:opsz,wght@14..32,400;14..32,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="login-body">
+  <div class="login-page">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="emblem">
+          <span class="emblem-line"></span>
+          <span class="emblem-text">Biofirm</span>
+          <span class="emblem-line"></span>
+        </div>
+        <p class="login-subtitle">Cadastro de Funcionários</p>
+      </div>
+      <form class="login-form" id="loginForm">
+        <div class="field">
+          <label for="username">Usuário ou e-mail</label>
+          <input type="text" id="username" placeholder="admin.teste ou admin@biofirm.local" required autofocus>
+        </div>
+        <div class="field">
+          <label for="password">Senha</label>
+          <input type="password" id="password" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn-primary">Entrar</button>
+      </form>
+      <p class="login-footer">Acesso restrito · Biofirm</p>
+    </div>
+    <div class="login-ruler"></div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/animations.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

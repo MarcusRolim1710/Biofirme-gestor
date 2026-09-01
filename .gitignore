@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Env - NAO subir chaves secretas
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel
