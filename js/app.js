@@ -1,9 +1,12 @@
 document.addEventListener('DOMContentLoaded', function() {
   const form = document.getElementById('loginForm');
-  var Anim = window.BiofirmAnimations;
+  if (!form) return;
+
+  function getAnim() { return window.BiofirmAnimations; }
 
   form.addEventListener('submit', async function(e) {
     e.preventDefault();
+    var Anim = getAnim();
 
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value.trim();
@@ -12,7 +15,7 @@ document.addEventListener('DOMContentLoaded', function() {
       if (Anim) Anim.shakeLoginCard();
       // feedback visual rápido no campo vazio
       var shakeTarget = !username ? document.getElementById('username') : document.getElementById('password');
-      if (shakeTarget && typeof gsap !== 'undefined' && !Anim.prefersReducedMotion()) {
+      if (shakeTarget && typeof gsap !== 'undefined' && Anim && Anim.prefersReducedMotion && !Anim.prefersReducedMotion()) {
         gsap.killTweensOf(shakeTarget);
         gsap.timeline().to(shakeTarget, { x: -6, duration: 0.07 }).to(shakeTarget, { x: 6, duration: 0.07 }).to(shakeTarget, { x: 0, duration: 0.1 });
       }
@@ -26,8 +29,8 @@ document.addEventListener('DOMContentLoaded', function() {
     try {
       const data = await login(email, password);
       sessionStorage.setItem('biofirm_user', JSON.stringify(data.user));
-      // Transição de saída sutil antes de navegar
-      if (typeof gsap !== 'undefined' && !Anim.prefersReducedMotion()) {
+      // Transição de saída sutil antes de navegar - com guard defensivo
+      if (typeof gsap !== 'undefined' && Anim && Anim.prefersReducedMotion && !Anim.prefersReducedMotion()) {
         var card = document.querySelector('.login-card');
         if (card) {
           gsap.to(card, { y: -12, autoAlpha: 0, duration: 0.35, ease: 'power2.in', onComplete: function(){ window.location.href = 'dashboard.html'; }});
@@ -36,7 +39,8 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       window.location.href = 'dashboard.html';
     } catch (err) {
-      if (Anim) { Anim.loginButtonLoading(false); Anim.shakeLoginCard(); }
+      var AnimErr = getAnim();
+      if (AnimErr) { AnimErr.loginButtonLoading(false); AnimErr.shakeLoginCard(); }
       alert(err.message || 'Erro de conexão com o banco de dados.');
     }
   });
@@ -46,6 +50,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var el = document.getElementById(id);
     if(!el) return;
     el.addEventListener('invalid', function(){
+      var Anim = getAnim();
       if (Anim) Anim.shakeLoginCard();
     });
   });
