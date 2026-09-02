@@ -364,6 +364,17 @@ body.login-body {
   border-color: var(--color-gold);
 }
 
+.btn-mobile-nav {
+  display: none;
+  font-size: 22px;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid var(--color-gold-light);
+  padding: 6px 10px;
+  cursor: pointer;
+  color: var(--color-text);
+}
+
 /* Conteúdo do Dashboard */
 .app-main {
   flex: 1;
@@ -883,7 +894,8 @@ body.login-body {
 }
 
 /* ==========================================================================
-   Responsividade
+   Responsividade — Biofirm (mobile-first refinada)
+   Breakpoints: 1024 / 768 / 640 / 480
    ========================================================================== */
 
 @media (max-width: 1024px) {
@@ -893,34 +905,169 @@ body.login-body {
   .app-main {
     padding: 24px 20px 36px;
   }
+  .table-wrap {
+    border-right: none;
+  }
 }
 
 @media (max-width: 768px) {
   .app-header {
     padding: 0 16px;
-    height: auto;
-    flex-wrap: wrap;
+    height: 60px;
     gap: 12px;
-    padding-top: 12px;
-    padding-bottom: 12px;
+    flex-wrap: nowrap;
+  }
+  .btn-mobile-nav {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
   }
   .app-nav {
-    order: 3;
-    width: 100%;
-    overflow-x: auto;
+    display: none;
+    position: absolute;
+    top: 60px;
+    left: 0;
+    right: 0;
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-gold-light);
+    flex-direction: column;
+    align-items: stretch;
     height: auto;
+    padding: 8px 16px 12px;
+    gap: 0;
+    box-shadow: var(--shadow-md);
+  }
+  .app-nav.open {
+    display: flex;
   }
   .nav-link {
-    height: 40px;
-    padding: 0 10px;
-    font-size: 13px;
+    height: 44px;
+    padding: 0 12px;
+    font-size: 14px;
+    border-bottom: 1px solid rgba(232, 213, 163, 0.3);
+  }
+  .nav-link.active::after {
+    height: 2px;
+  }
+  .app-user {
+    gap: 10px;
+  }
+  .user-info {
+    display: none;
   }
   .page-header {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
     gap: 16px;
+  }
+  .page-header .btn-primary {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .filter-search-wrap,
+  .filter-select {
+    min-width: 0;
+    width: 100%;
+    flex: none;
+  }
+  .filter-input,
+  .filter-select {
+    min-height: 44px;
   }
   .form-grid {
     grid-template-columns: 1fr;
   }
+  .modal-card {
+    padding: 24px 18px;
+    max-width: 100%;
+    margin: 12px;
+    max-height: 94vh;
+  }
+  .modal-actions {
+    flex-wrap: wrap;
+  }
+  .modal-actions .btn-primary,
+  .modal-actions .btn-secondary {
+    flex: 1 1 140px;
+    justify-content: center;
+    min-height: 44px;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Tabela vira cards no celular (<640px) e scroll suave */
+@media (max-width: 640px) {
+  .app-main {
+    padding: 16px 14px 28px;
+  }
+  .card {
+    padding: 16px;
+  }
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .employee-table {
+    min-width: 620px;
+  }
+  /* opcional: se quiser cards nativos, descomente bloco abaixo e remova min-width acima
+  .employee-table thead { display: none; }
+  .employee-table tr { display: block; border: 1px solid var(--color-gold-light); margin-bottom: 12px; background: #FFFDF9; }
+  .employee-table td { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(232,213,163,0.3); }
+  .employee-table td::before { content: attr(data-label); font-size: 11px; font-weight: 600; color: var(--color-text-muted); text-transform: uppercase; margin-right: 12px; }
+  */
+  .actions {
+    flex-wrap: wrap;
+  }
+  .action-btn {
+    min-height: 36px;
+    padding: 6px 12px;
+  }
+  .stats-grid {
+    gap: 10px;
+  }
+  .stat-value {
+    font-size: 20px;
+  }
+  .login-card {
+    padding: 32px 20px 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .brand-emblem {
+    font-size: 20px;
+  }
+  .page-title-group h1 {
+    font-size: 26px;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .detail-box {
+    padding: 12px;
+  }
+  .btn-primary,
+  .btn-secondary {
+    min-height: 44px;
+  }
+  .field input,
+  .field select {
+    font-size: 16px; /* evita zoom no iOS */
+  }
+}
+
+/* Melhor scroll horizontal em filtros e nav no mobile */
+.app-nav,
+.table-wrap {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-gold-light) transparent;
 }

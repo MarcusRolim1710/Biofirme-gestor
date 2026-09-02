@@ -793,6 +793,26 @@ document.addEventListener('DOMContentLoaded', function() {
     }catch(err){ alert('Erro ao salvar cargo: '+err.message); }
   });
   if(document.getElementById('cargoSalario') && window.BiofirmMasks) window.BiofirmMasks.bind(document.getElementById('cargoSalario'),'money');
+  // Mobile nav — hamburger
+  (function(){
+    const btn = document.getElementById('btnMobileNav');
+    const nav = document.getElementById('appNav');
+    if(!btn || !nav) return;
+    btn.addEventListener('click', function(){
+      const open = nav.classList.toggle('open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      btn.textContent = open ? '✕' : '☰';
+    });
+    nav.querySelectorAll('.nav-link').forEach(a=> a.addEventListener('click', function(){
+      if(window.innerWidth <= 768){ nav.classList.remove('open'); btn.setAttribute('aria-expanded','false'); btn.textContent='☰'; }
+    }));
+    document.addEventListener('click', function(e){
+      if(window.innerWidth > 768) return;
+      if(!nav.classList.contains('open')) return;
+      if(nav.contains(e.target) || btn.contains(e.target)) return;
+      nav.classList.remove('open'); btn.setAttribute('aria-expanded','false'); btn.textContent='☰';
+    });
+  })();
   // Arquivos diversos — adicionar à lista
   if(btnAddDiverso) btnAddDiverso.addEventListener('click', async function(){
     const tipo = divDocTipoInput ? divDocTipoInput.value : 'outro';
