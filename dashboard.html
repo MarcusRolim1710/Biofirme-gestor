@@ -26,7 +26,7 @@
       </div>
       <nav class="app-nav">
         <a href="dashboard.html" class="nav-link active">Funcionários</a>
-        <a href="#cargos" class="nav-link">Cargos & Setores</a>
+        <a href="#" class="nav-link" id="navCargos">Cargos & Setores</a>
         <a href="#relatorios" class="nav-link">Relatórios</a>
       </nav>
       <div class="app-user">
@@ -188,12 +188,23 @@
             <input type="text" id="empPis" data-mask="pis" placeholder="000.00000.00-0" maxlength="14">
           </div>
           <div class="field">
-            <label for="empCargo">Cargo</label>
-            <input type="text" id="empCargo" placeholder="Ex: Farmacêutico(a)">
+            <label for="empCargo">Cargo / Função *</label>
+            <div style="display:flex; gap:8px;">
+              <select id="empCargo" style="flex:1;">
+                <option value="">Selecione o cargo</option>
+              </select>
+              <button type="button" id="btnManageCargos" class="btn-secondary btn-small" title="Gerenciar cargos" style="white-space:nowrap;">⚙ Cargos</button>
+            </div>
+            <span style="font-size:11px; color:var(--color-text-muted);" id="cargoSalarioInfo">Salário fixo definido no cargo — herdado automaticamente</span>
           </div>
           <div class="field">
+            <label for="empSalario">Salário (herdado do cargo)</label>
+            <input type="text" id="empSalario" data-mask="money" placeholder="R$ 0,00" readonly style="background:#F8F3E6; cursor:not-allowed;">
+          </div>
+          <div class="field full-width" style="display:none;" id="fieldSetorManual">
             <label for="empSetor">Setor</label>
-            <input type="text" id="empSetor" placeholder="Ex: Laboratório / Produção">
+            <input type="text" id="empSetor" placeholder="Ex: Laboratório / Produção" readonly style="background:#F8F3E6;">
+            <span style="font-size:11px; color:var(--color-text-muted);">Setor vem do cargo selecionado</span>
           </div>
           <fieldset class="field full-width" style="border: 1px solid var(--color-gold-light); border-radius: 8px; padding: 12px; margin-top: 4px;">
             <legend style="font-size: 12px; color: var(--color-text-muted); font-weight: 500; padding: 0 8px;">Endereço</legend>
@@ -256,6 +267,32 @@
                 </select>
               </div>
             </div>
+          </fieldset>
+          <!-- Arquivos Diversos — Certificados, Docs Filhos, Outros -->
+          <fieldset class="field full-width" style="border: 1px solid var(--color-gold-light); border-radius: 8px; padding: 12px; margin-top: 4px;">
+            <legend style="font-size: 12px; color: var(--color-text-muted); font-weight: 500; padding: 0 8px;">Arquivos Diversos — Certificados, Documentos dos Filhos, Outros</legend>
+            <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; margin-top:8px;">
+              <div class="field" style="min-width:140px; flex:1;">
+                <label for="divDocTipo">Tipo</label>
+                <select id="divDocTipo">
+                  <option value="certificado">Certificado (curso superior, etc.)</option>
+                  <option value="doc_filho">Documento de filho/dependente</option>
+                  <option value="outro">Outro</option>
+                </select>
+              </div>
+              <div class="field" style="min-width:160px; flex:1.4;">
+                <label for="divDocTitulo">Título / Descrição</label>
+                <input type="text" id="divDocTitulo" placeholder="Ex: Diploma Superior — Farmácia">
+              </div>
+              <div class="field" style="min-width:160px; flex:1;">
+                <label for="divDocFile">Arquivo (imagem/PDF até 10MB)</label>
+                <input type="file" id="divDocFile" accept="image/*,application/pdf">
+              </div>
+              <button type="button" id="btnAddDiverso" class="btn-secondary btn-small" style="height:38px;">+ Adicionar</button>
+            </div>
+            <div id="divDocInfo" style="font-size:11px; color:var(--color-text-muted); margin-top:6px;"></div>
+            <ul id="docDiversosList" style="list-style:none; padding:0; margin:10px 0 0; display:flex; flex-direction:column; gap:6px;"></ul>
+            <p style="font-size:11px; color:var(--color-text-muted); margin-top:6px;">Cada arquivo será salvo em <code>employee-docs/diversos/</code>. Ao editar um funcionário já salvo, os arquivos são enviados imediatamente.</p>
           </fieldset>
           <!-- Documentação Anexa (com compressão) -->
           <fieldset class="field full-width" style="border: 1px solid var(--color-gold-light); border-radius: 8px; padding: 12px; margin-top: 4px;">
@@ -337,6 +374,36 @@
       <div class="modal-actions">
         <button type="button" class="btn-secondary" id="btnCloseViewBtn">Fechar</button>
         <button type="button" class="btn-primary" id="btnPrintFichaBtn">Exportar PDF — Ficha Completa</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Cargos & Setores — Salário fixo por função -->
+  <div class="modal-backdrop" id="cargoModal">
+    <div class="modal-card" style="max-width:640px;">
+      <div class="modal-header">
+        <h2 class="modal-title">Cargos & Setores — Salário fixo</h2>
+        <button class="modal-close" id="btnCloseCargoModal">&times;</button>
+      </div>
+      <p style="font-size:13px; color:var(--color-text-muted); margin-bottom:14px;">Cada cargo tem um <strong>salário fixo</strong>. Ao vincular um funcionário ao cargo, o salário é herdado automaticamente (trigger <code>sync_salario_from_position</code>).</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; align-items:flex-end;">
+        <div class="field" style="flex:1.2; min-width:160px;">
+          <label for="cargoNome">Nome do cargo *</label>
+          <input type="text" id="cargoNome" placeholder="Ex: Farmacêutico(a)">
+        </div>
+        <div class="field" style="flex:1; min-width:140px;">
+          <label for="cargoSetor">Setor</label>
+          <input type="text" id="cargoSetor" placeholder="Ex: Laboratório">
+        </div>
+        <div class="field" style="flex:0.8; min-width:130px;">
+          <label for="cargoSalario">Salário fixo *</label>
+          <input type="text" id="cargoSalario" data-mask="money" placeholder="R$ 0,00">
+        </div>
+        <button type="button" id="btnSaveCargo" class="btn-primary btn-small" style="height:38px;">Salvar cargo</button>
+      </div>
+      <div id="cargoList" style="border:1px solid var(--color-gold-light); background:#FFFDF9; max-height:260px; overflow:auto;"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" id="btnCloseCargoBtn">Fechar</button>
       </div>
     </div>
   </div>

@@ -114,6 +114,132 @@ document.addEventListener('DOMContentLoaded', function() {
   const empCpfDocUrlInput = document.getElementById('empCpfDocUrl');
   const empCompEndUrlInput = document.getElementById('empCompEndUrl');
   const empCtpsDocUrlInput = document.getElementById('empCtpsDocUrl');
+  // Cargo/Salário herdado + arquivos diversos
+  const empSalarioInput = document.getElementById('empSalario');
+  const cargoSalarioInfo = document.getElementById('cargoSalarioInfo');
+  const divDocTipoInput = document.getElementById('divDocTipo');
+  const divDocTituloInput = document.getElementById('divDocTitulo');
+  const divDocFileInput = document.getElementById('divDocFile');
+  const divDocInfo = document.getElementById('divDocInfo');
+  const docDiversosList = document.getElementById('docDiversosList');
+  const btnAddDiverso = document.getElementById('btnAddDiverso');
+  let positions = [];
+  let pendingDiversos = []; // {tipo,titulo,file,compressedFile} para funcionário ainda não salvo
+  let employeeDiversos = []; // docs do funcionário em edição (vindos do banco)
+
+  function formatMoneyBRL(v){
+    const n = Number(v);
+    if(isNaN(n)) return '-';
+    return n.toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
+  }
+  function parseMoneyBRL(str){
+    if(!str) return null;
+    const cleaned = str.replace(/[^0-9,]/g, '').replace(/\./g, '').replace(',', '.');
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? null : n;
+  }
+
+  // 2a. Cargos com salário fixo
+  async function fetchPositions(){
+    try{
+      const { data, error } = await supabaseClient.from('positions').select('*').order('nome');
+      if(error) throw error;
+      positions = data || [];
+      renderCargoSelect();
+      renderCargoList();
+    }catch(err){ console.error('positions', err); }
+  }
+  function renderCargoSelect(){
+    if(!empCargoInput) return;
+    const cur = empCargoInput.value;
+    empCargoInput.innerHTML = '<option value="">Selecione o cargo</option>' + positions.map(p=> `<option value="${p.id}">${p.nome}${p.setor? ' · '+p.setor:''} — ${formatMoneyBRL(p.salario_base)}</option>`).join('');
+    if(cur) empCargoInput.value = cur;
+  }
+  function renderCargoList(){
+    const wrap = document.getElementById('cargoList');
+    if(!wrap) return;
+    if(positions.length===0){ wrap.innerHTML='<p style="padding:12px; color:var(--color-text-muted); font-size:13px;">Nenhum cargo cadastrado. Crie o primeiro acima.</p>'; return; }
+    wrap.innerHTML = positions.map(p=> `
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid var(--color-gold-light);">
+        <div>
+          <div style="font-weight:600; font-size:13px;">${p.nome}</div>
+          <div style="font-size:11px; color:var(--color-text-muted);">${p.setor||'Sem setor'} · ${formatMoneyBRL(p.salario_base)}</div>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button class="btn-secondary btn-small" data-cargo-edit="${p.id}">Editar</button>
+          <button class="action-btn action-btn-danger" data-cargo-del="${p.id}">Excluir</button>
+        </div>
+      </div>
+    `).join('');
+    wrap.querySelectorAll('[data-cargo-edit]').forEach(btn=> btn.addEventListener('click', ()=> {
+      const p = positions.find(x=> x.id==btn.getAttribute('data-cargo-edit')); if(!p) return;
+      document.getElementById('cargoNome').value = p.nome;
+      document.getElementById('cargoSetor').value = p.setor||'';
+      document.getElementById('cargoSalario').value = formatMoneyBRL(p.salario_base).replace('R$','').trim();
+      document.getElementById('cargoSalario').dataset.editId = p.id;
+      if(window.BiofirmMasks) window.BiofirmMasks.bind(document.getElementById('cargoSalario'),'money');
+    }));
+    wrap.querySelectorAll('[data-cargo-del]').forEach(btn=> btn.addEventListener('click', async ()=> {
+      const id = btn.getAttribute('data-cargo-del');
+      if(!confirm('Excluir este cargo? Funcionários vinculados ficarão sem cargo_id mas mantêm cargo/salário atuais.')) return;
+      const { error } = await supabaseClient.from('positions').delete().eq('id', id);
+      if(error) alert('Erro: '+error.message); else await fetchPositions();
+    }));
+  }
+  function syncSalarioFromCargo(){
+    const id = empCargoInput ? empCargoInput.value : '';
+    const pos = positions.find(p=> String(p.id)===String(id));
+    if(pos){
+      if(empSalarioInput) empSalarioInput.value = formatMoneyBRL(pos.salario_base);
+      if(cargoSalarioInfo) cargoSalarioInfo.textContent = `Salário fixo: ${formatMoneyBRL(pos.salario_base)} · Setor: ${pos.setor||'-'}`;
+      if(empSetorInput) empSetorInput.value = pos.setor||'';
+    } else {
+      if(empSalarioInput) empSalarioInput.value = '';
+      if(cargoSalarioInfo) cargoSalarioInfo.textContent = 'Salário fixo definido no cargo — herdado automaticamente';
+      if(empSetorInput) empSetorInput.value = '';
+    }
+  }
+  // 2b. Arquivos diversos
+  async function fetchDiversos(employeeId){
+    if(!employeeId) { employeeDiversos=[]; renderDiversosList(); return; }
+    const { data, error } = await supabaseClient.from('employee_documents').select('*').eq('employee_id', employeeId).order('created_at');
+    if(error){ console.error(error); employeeDiversos=[]; } else employeeDiversos = data||[];
+    renderDiversosList();
+  }
+  function renderDiversosList(){
+    if(!docDiversosList) return;
+    const all = [...employeeDiversos.map(d=> ({...d, _saved:true})), ...pendingDiversos.map((d,i)=> ({...d, _pendingIndex:i, _saved:false}))];
+    if(all.length===0){ docDiversosList.innerHTML='<li style="font-size:12px; color:var(--color-text-muted); padding:6px;">Nenhum arquivo diverso adicionado.</li>'; return; }
+    const labelTipo = { certificado:'Certificado', doc_filho:'Doc. filho', outro:'Outro' };
+    docDiversosList.innerHTML = all.map((d,idx)=>{
+      const isSaved = d._saved;
+      const title = isSaved ? d.titulo : d.titulo;
+      const tipo = isSaved ? d.tipo : d.tipo;
+      const url = isSaved ? d.url : '#';
+      const meta = isSaved ? (d.mime||'') + (d.tamanho_bytes? ' · '+ (d.tamanho_bytes/1024).toFixed(1)+'KB':'') : ((d.file? d.file.name : '') + (d.file? ' · '+(d.file.size/1024).toFixed(1)+'KB':''));
+      return `<li style="display:flex; align-items:center; justify-content:space-between; padding:8px; border:1px solid var(--color-gold-light); background:#FFFDF9;">
+        <div style="min-width:0; flex:1;">
+          <div style="font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><span style="background:var(--color-gold-light); padding:2px 6px; font-size:10px; margin-right:6px;">${labelTipo[tipo]||tipo}</span>${title}</div>
+          <div style="font-size:11px; color:var(--color-text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${isSaved? `<a href="${url}" target="_blank" style="color:var(--color-info); text-decoration:underline;">abrir</a> · `:''}${meta} ${isSaved? '': '· pendente (será enviado ao salvar)'}</div>
+        </div>
+        <button type="button" class="action-btn ${isSaved?'action-btn-danger':''}" data-div-del="${isSaved? d.id : 'pending:'+d._pendingIndex}" style="margin-left:8px;">${isSaved?'Remover':'×'}</button>
+      </li>`;
+    }).join('');
+    docDiversosList.querySelectorAll('[data-div-del]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const v = btn.getAttribute('data-div-del');
+        if(v.startsWith('pending:')){
+          const idx = parseInt(v.split(':')[1],10);
+          pendingDiversos.splice(idx,1);
+          renderDiversosList();
+        } else {
+          if(!confirm('Remover este arquivo diverso?')) return;
+          const { error } = await supabaseClient.from('employee_documents').delete().eq('id', v);
+          if(error) alert('Erro: '+error.message); else await fetchDiversos(employeeDiversos[0]? employeeDiversos[0].employee_id : null);
+        }
+      });
+    });
+  }
 
   // 2. Carregar Dados da API
   async function fetchEmployees() {
@@ -222,7 +348,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <td class="mono">${formatCPF(emp.cpf)}</td>
         <td>
           <div style="font-weight: 500;">${emp.cargo || '-'}</div>
-          <div class="employee-role-dept">${emp.setor || '-'}</div>
+          <div class="employee-role-dept">${emp.setor || '-'}${emp.salario!=null? ' · '+formatMoneyBRL(emp.salario):''}</div>
         </td>
         <td>
           <span class="status-badge ${statusClass}">${emp.status || 'Sem dados'}</span>
@@ -309,12 +435,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const fotoHtml = emp.foto_url ? `<img src="${emp.foto_url}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:1px solid var(--color-gold);">` : `<div class="detail-avatar">${initial}</div>`;
     const docsCount = [emp.rg_frente_url, emp.rg_verso_url, emp.cpf_doc_url, emp.comprovante_endereco_url, emp.ctps_doc_url].filter(Boolean).length;
+    const salarioTxt = emp.salario!=null ? formatMoneyBRL(emp.salario) : (emp.cargo_id && positions.find(p=> String(p.id)===String(emp.cargo_id)) ? formatMoneyBRL(positions.find(p=> String(p.id)===String(emp.cargo_id)).salario_base) : '-');
     detailContent.innerHTML = `
       <div class="detail-header">
         ${fotoHtml}
         <div>
           <div class="detail-title">${emp.name}</div>
-          <div class="detail-subtitle">${emp.cargo || 'Cargo não informado'}</div>
+          <div class="detail-subtitle">${emp.cargo || 'Cargo não informado'} · <span style="color:var(--color-success); font-weight:600;">${salarioTxt}</span></div>
           <div style="font-size:11px; color:var(--color-text-muted);">${docsCount}/5 docs · CTPS: ${emp.ctps_numero||'-'} · PIS: ${emp.pis_pasep? (window.BiofirmMasks? window.BiofirmMasks.MASKS.pis(emp.pis_pasep): emp.pis_pasep) : '-'}</div>
         </div>
       </div>
@@ -377,6 +504,12 @@ document.addEventListener('DOMContentLoaded', function() {
     employeeForm.reset();
     empVinculoInput.value = 'Ativo';
     empStatusInput.value = 'Sem dados';
+    if(empCargoInput) empCargoInput.value='';
+    if(empSalarioInput) empSalarioInput.value='';
+    if(cargoSalarioInfo) cargoSalarioInfo.textContent='Salário fixo definido no cargo — herdado automaticamente';
+    if(empSetorInput) empSetorInput.value='';
+    pendingDiversos = []; employeeDiversos = []; renderDiversosList();
+    if(divDocInfo) divDocInfo.textContent='';
     clearAddress();
     clearDocsPreview();
     if (fotoPreviewWrap) fotoPreviewWrap.style.backgroundImage = '';
@@ -393,8 +526,18 @@ document.addEventListener('DOMContentLoaded', function() {
     empRgInput.value = emp.rg || '';
     if (empCtpsNumeroInput) empCtpsNumeroInput.value = emp.ctps_numero || '';
     if (empPisInput) empPisInput.value = emp.pis_pasep || '';
-    empCargoInput.value = emp.cargo || '';
-    empSetorInput.value = emp.setor || '';
+    if (empCargoInput) {
+      // prioriza cargo_id, fallback texto legado
+      if(emp.cargo_id) empCargoInput.value = String(emp.cargo_id);
+      else {
+        const found = positions.find(p=> p.nome===emp.cargo);
+        empCargoInput.value = found ? String(found.id) : '';
+      }
+      syncSalarioFromCargo();
+      // se trigger ainda não herdou salário, mostra valor do cargo base
+      if(emp.salario!=null && empSalarioInput) empSalarioInput.value = formatMoneyBRL(emp.salario);
+    }
+    if (empSetorInput) empSetorInput.value = emp.setor || '';
     empVinculoInput.value = emp.vinculo || 'Ativo';
     empStatusInput.value = emp.status || 'Sem dados';
     empCepInput.value = emp.cep || '';
@@ -421,6 +564,10 @@ document.addEventListener('DOMContentLoaded', function() {
     renderDocLink('infoCpfDoc', emp.cpf_doc_url);
     renderDocLink('infoCompEnd', emp.comprovante_endereco_url);
     renderDocLink('infoCtpsDoc', emp.ctps_doc_url);
+    pendingDiversos = []; fetchDiversos(emp.id);
+    if(divDocInfo) divDocInfo.textContent='';
+    if(divDocFileInput) divDocFileInput.value='';
+    if(divDocTituloInput) divDocTituloInput.value='';
     if (window.BiofirmAnimations) window.BiofirmAnimations.openModalAnimated(employeeModal);
     else employeeModal.classList.add('active');
   }
@@ -499,14 +646,16 @@ document.addEventListener('DOMContentLoaded', function() {
      if (uf) uf.disabled = disable;
    }
 
-     function closeModal() {
-       function doReset(){
-         employeeForm.reset();
-         clearAddress();
-         clearDocsPreview();
-         if(fotoPreviewWrap) fotoPreviewWrap.style.backgroundImage='';
-         [empFotoInput, empRgFrenteInput, empRgVersoInput, empCpfDocInput, empCompEndInput, empCtpsDocInput].forEach(inp=>{ if(inp){ inp.value=''; delete inp._compressedFile; }});
-       }
+      function closeModal() {
+        function doReset(){
+          employeeForm.reset();
+          clearAddress();
+          clearDocsPreview();
+          pendingDiversos=[]; employeeDiversos=[]; renderDiversosList(); if(divDocInfo) divDocInfo.textContent=''; if(divDocFileInput) divDocFileInput.value=''; if(divDocTituloInput) divDocTituloInput.value='';
+          if(empSalarioInput) empSalarioInput.value=''; if(cargoSalarioInfo) cargoSalarioInfo.textContent='Salário fixo definido no cargo — herdado automaticamente';
+          if(fotoPreviewWrap) fotoPreviewWrap.style.backgroundImage='';
+          [empFotoInput, empRgFrenteInput, empRgVersoInput, empCpfDocInput, empCompEndInput, empCtpsDocInput].forEach(inp=>{ if(inp){ inp.value=''; delete inp._compressedFile; }});
+        }
        if (window.BiofirmAnimations) window.BiofirmAnimations.closeModalAnimated(employeeModal, doReset);
        else { employeeModal.classList.remove('active'); doReset(); }
      }
@@ -605,6 +754,83 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   if (empCtpsNumeroInput && window.BiofirmMasks) window.BiofirmMasks.bind(empCtpsNumeroInput, 'ctps');
   if (empPisInput && window.BiofirmMasks) window.BiofirmMasks.bind(empPisInput, 'pis');
+  if (empSalarioInput && window.BiofirmMasks) window.BiofirmMasks.bind(empSalarioInput, 'money');
+  if (empCargoInput) empCargoInput.addEventListener('change', syncSalarioFromCargo);
+  // Cargos modal
+  const cargoModal = document.getElementById('cargoModal');
+  const btnManageCargos = document.getElementById('btnManageCargos');
+  const navCargos = document.getElementById('navCargos');
+  const btnCloseCargoModal = document.getElementById('btnCloseCargoModal');
+  const btnCloseCargoBtn = document.getElementById('btnCloseCargoBtn');
+  const btnSaveCargo = document.getElementById('btnSaveCargo');
+  function openCargoModal(){ if(window.BiofirmAnimations) window.BiofirmAnimations.openModalAnimated(cargoModal); else cargoModal.classList.add('active'); renderCargoList(); }
+  function closeCargoModal(){ if(window.BiofirmAnimations) window.BiofirmAnimations.closeModalAnimated(cargoModal); else cargoModal.classList.remove('active'); const n=document.getElementById('cargoNome'); if(n) n.value=''; const s=document.getElementById('cargoSetor'); if(s) s.value=''; const sal=document.getElementById('cargoSalario'); if(sal){ sal.value=''; delete sal.dataset.editId; } }
+  if(btnManageCargos) btnManageCargos.addEventListener('click', openCargoModal);
+  if(navCargos) navCargos.addEventListener('click', function(e){ e.preventDefault(); openCargoModal(); });
+  if(btnCloseCargoModal) btnCloseCargoModal.addEventListener('click', closeCargoModal);
+  if(btnCloseCargoBtn) btnCloseCargoBtn.addEventListener('click', closeCargoModal);
+  if(cargoModal) cargoModal.addEventListener('click', function(e){ if(e.target===cargoModal) closeCargoModal(); });
+  if(btnSaveCargo) btnSaveCargo.addEventListener('click', async function(){
+    const nomeEl=document.getElementById('cargoNome');
+    const setorEl=document.getElementById('cargoSetor');
+    const salEl=document.getElementById('cargoSalario');
+    const nome=(nomeEl?nomeEl.value:'').trim();
+    const setor=(setorEl?setorEl.value:'').trim();
+    const salarioVal=parseMoneyBRL(salEl? salEl.value : '');
+    if(!nome){ alert('Informe o nome do cargo.'); return; }
+    if(salarioVal==null || salarioVal<0){ alert('Informe salário válido (R$).'); return; }
+    const editId = salEl && salEl.dataset.editId ? salEl.dataset.editId : null;
+    try{
+      if(editId){
+        const { error } = await supabaseClient.from('positions').update({ nome, setor: setor||null, salario_base: salarioVal }).eq('id', editId);
+        if(error) throw error;
+      } else {
+        const { error } = await supabaseClient.from('positions').insert({ nome, setor: setor||null, salario_base: salarioVal });
+        if(error) throw error;
+      }
+      if(nomeEl) nomeEl.value=''; if(setorEl) setorEl.value=''; if(salEl){ salEl.value=''; delete salEl.dataset.editId; }
+      await fetchPositions();
+    }catch(err){ alert('Erro ao salvar cargo: '+err.message); }
+  });
+  if(document.getElementById('cargoSalario') && window.BiofirmMasks) window.BiofirmMasks.bind(document.getElementById('cargoSalario'),'money');
+  // Arquivos diversos — adicionar à lista
+  if(btnAddDiverso) btnAddDiverso.addEventListener('click', async function(){
+    const tipo = divDocTipoInput ? divDocTipoInput.value : 'outro';
+    const titulo = divDocTituloInput ? divDocTituloInput.value.trim() : '';
+    const file = divDocFileInput && divDocFileInput.files[0] ? divDocFileInput.files[0] : null;
+    if(!titulo){ alert('Informe o título/descrição do arquivo.'); return; }
+    if(!file){ alert('Selecione o arquivo.'); return; }
+    if(file.size > 10*1024*1024){ alert('Arquivo excede 10MB.'); return; }
+    const empId = empIdInput && empIdInput.value ? empIdInput.value : null;
+    // se funcionário já salvo (edição), envia imediatamente
+    if(empId){
+      try{
+        if(divDocInfo) divDocInfo.textContent='Enviando...';
+        let toUpload = file;
+        if(window.BiofirmCompress && file.type.startsWith('image/')){
+          try{ toUpload = await window.BiofirmCompress.compressImage(file, { maxWidth:1280, quality:0.72 }); }catch(e){ toUpload=file; }
+        }
+        const url = await uploadFile(toUpload, 'diversos', empId);
+        const { error } = await supabaseClient.from('employee_documents').insert({ employee_id: Number(empId), tipo, titulo, url, mime: toUpload.type, tamanho_bytes: toUpload.size });
+        if(error) throw error;
+        if(divDocFileInput) divDocFileInput.value='';
+        if(divDocTituloInput) divDocTituloInput.value='';
+        if(divDocInfo) divDocInfo.textContent='Arquivo enviado com sucesso.';
+        await fetchDiversos(empId);
+      }catch(err){ if(divDocInfo) divDocInfo.textContent='Erro: '+err.message; alert('Erro ao enviar: '+err.message); }
+    } else {
+      // modo criação — fila pendente, será enviado após criar funcionário
+      let compressed = file;
+      if(window.BiofirmCompress && file.type.startsWith('image/')){
+        try{ compressed = await window.BiofirmCompress.compressImage(file, { maxWidth:1280, quality:0.72 }); }catch(e){ compressed=file; }
+      }
+      pendingDiversos.push({ tipo, titulo, file: compressed, origName: file.name });
+      if(divDocFileInput) divDocFileInput.value='';
+      if(divDocTituloInput) divDocTituloInput.value='';
+      if(divDocInfo) divDocInfo.textContent='Adicionado à fila — será enviado ao salvar o funcionário.';
+      renderDiversosList();
+    }
+  });
 
   // Upload helpers com compressão (economia 1GB)
   const BUCKET = 'employee-docs';
@@ -757,7 +983,7 @@ document.addEventListener('DOMContentLoaded', function() {
   bindDocInput(empCtpsDocInput, empCtpsDocUrlInput, 'infoCtpsDoc', 'previewCtpsDoc');
 
   function clearAllErrors() {
-    [empNameInput, empCpfInput, empRgInput, empCtpsNumeroInput, empPisInput, empCargoInput, empSetorInput, empCepInput, empNumeroInput].forEach(function (input) {
+    [empNameInput, empCpfInput, empRgInput, empCtpsNumeroInput, empPisInput, empCargoInput, empSetorInput, empSalarioInput, empCepInput, empNumeroInput].forEach(function (input) {
       if (input) removeFieldError(input);
     });
   }
@@ -794,13 +1020,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
 
+      const cargoIdVal = empCargoInput && empCargoInput.value ? Number(empCargoInput.value) : null;
       const payload = {
         name: empNameInput.value.trim(),
         cpf: empCpfInput.value.trim(),
         rg: empRgInput ? empRgInput.value.trim() : '',
         ctps_numero: empCtpsNumeroInput ? empCtpsNumeroInput.value.trim() : '',
         pis_pasep: empPisInput ? empPisInput.value.trim() : '',
-        cargo: empCargoInput.value.trim(),
+        cargo_id: cargoIdVal,
+        // cargo/setor serão sincronizados pelo trigger sync_salario_from_position, mas enviamos fallback
         setor: empSetorInput.value.trim(),
         vinculo: empVinculoInput.value,
         status: empStatusInput.value,
@@ -818,6 +1046,13 @@ document.addEventListener('DOMContentLoaded', function() {
         comprovante_endereco_url: empCompEndUrlInput ? empCompEndUrlInput.value.trim() : '',
         ctps_doc_url: empCtpsDocUrlInput ? empCtpsDocUrlInput.value.trim() : ''
       };
+      // se cargo_id presente, não precisa enviar cargo texto (trigger seta), mas mantém compat
+      if(cargoIdVal){
+        const pos = positions.find(p=> p.id===cargoIdVal);
+        if(pos) payload.cargo = pos.nome;
+      } else {
+        payload.cargo = null;
+      }
       // Normaliza vazios para null (evita string vazia no banco)
       Object.keys(payload).forEach(k=>{ if(payload[k]==='') payload[k]=null; });
 
@@ -832,28 +1067,48 @@ document.addEventListener('DOMContentLoaded', function() {
         showFieldError(empCpfInput, 'CPF inválido.');
         hasError = true;
       }
+      if (!payload.cargo_id) {
+        showFieldError(empCargoInput, 'Selecione o cargo/função.');
+        hasError = true;
+      }
       if (payload.rg && !validateRG(payload.rg)) {
         showFieldError(empRgInput, 'RG inválido.');
         hasError = true;
       }
-      if (hasError) return;
+      if (hasError) { if(btnSave){ btnSave.disabled=false; btnSave.textContent=origBtnText; } return; }
 
+      let savedId = id ? Number(id) : null;
       if (id) {
         const { error } = await supabaseClient
           .from('employees')
           .update(payload)
           .eq('id', id);
         if (error) throw error;
+        savedId = Number(id);
       } else {
-        const { error } = await supabaseClient
+        const { data, error } = await supabaseClient
           .from('employees')
-          .insert(payload);
+          .insert(payload)
+          .select('id')
+          .single();
         if (error) throw error;
+        savedId = data ? data.id : null;
+      }
+      // envia arquivos diversos pendentes (modo criação)
+      if(pendingDiversos.length>0 && savedId){
+        for(const pd of pendingDiversos){
+          try{
+            const url = await uploadFile(pd.file, 'diversos', String(savedId));
+            const { error } = await supabaseClient.from('employee_documents').insert({ employee_id: savedId, tipo: pd.tipo, titulo: pd.titulo, url, mime: pd.file.type, tamanho_bytes: pd.file.size });
+            if(error) console.error('diversos insert', error);
+          }catch(e){ console.error('diversos upload', e); }
+        }
+        pendingDiversos = [];
       }
 
       closeModal();
       await fetchEmployees();
-      if (id) selectedEmployeeId = id;
+      if (savedId) selectedEmployeeId = String(savedId);
     } catch (err) {
       alert('Erro: ' + err.message);
     } finally {
@@ -892,8 +1147,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
+  let viewModalEmployeeId = null;
   // 10. Funções Globais de Visualização / Modal
-  window.viewEmployeeDetail = function(id) {
+  window.viewEmployeeDetail = async function(id) {
+    viewModalEmployeeId = id;
     const emp = employees.find(e => e.id == id);
     if (!emp) return;
 
@@ -906,6 +1163,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const addressText = formatAddress(emp) || 'Endereço não cadastrado';
     const fotoView = emp.foto_url ? `<img src="${emp.foto_url}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--color-gold);">` : `<div style="width:64px;height:64px;border-radius:50%;background:#F0E6CE;border:1px solid var(--color-gold);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-style:italic;">${emp.name?emp.name.charAt(0).toUpperCase():'B'}</div>`;
     const docLink = (url,label) => url ? `<a href="${url}" target="_blank" style="color:var(--color-info);text-decoration:underline;">${label} — abrir</a>` : `<span style="color:var(--color-text-muted);">${label} — pendente</span>`;
+    const pos = emp.cargo_id ? positions.find(p=> String(p.id)===String(emp.cargo_id)) : null;
+    const salarioView = emp.salario!=null ? formatMoneyBRL(emp.salario) : (pos? formatMoneyBRL(pos.salario_base) : '-');
+    // busca docs diversos para exibir na ficha
+    let diversos = [];
+    try{
+      const { data } = await supabaseClient.from('employee_documents').select('*').eq('employee_id', emp.id).order('created_at');
+      diversos = data || [];
+    }catch(e){}
+    const diversosHtml = diversos.length ? diversos.map(d=> `<div style="font-size:11px; padding:4px 0; border-bottom:1px solid #F0E6CE;"><span style="background:var(--color-gold-light); padding:1px 5px; font-size:10px;">${d.tipo==='certificado'?'Certificado':d.tipo==='doc_filho'?'Doc. filho':'Outro'}</span> <a href="${d.url}" target="_blank" style="color:var(--color-info); text-decoration:underline;">${d.titulo}</a> <span style="color:var(--color-text-muted);">· ${d.mime||''}</span></div>`).join('') : '<span style="color:var(--color-text-muted); font-size:11px;">Nenhum arquivo diverso.</span>';
     viewContent.innerHTML = `
       <div style="background: #FFFDF9; border: 1px solid var(--color-gold-light); padding: 24px; margin-bottom: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--color-gold-light); padding-bottom: 14px; margin-bottom: 16px; gap:12px;">
@@ -913,8 +1179,8 @@ document.addEventListener('DOMContentLoaded', function() {
             ${fotoView}
             <div>
               <h3 style="font-family: var(--font-display); font-size: 20px; font-style: italic; color: var(--color-text);">${emp.name}</h3>
-              <p style="font-size: 13px; color: var(--color-text-muted);">${emp.cargo || 'Cargo não especificado'} · ${emp.setor || 'Setor não especificado'}</p>
-              <p class="mono" style="font-size:11px; color:var(--color-text-muted);">CTPS: ${emp.ctps_numero || '-'} · PIS: ${emp.pis_pasep || '-'}</p>
+              <p style="font-size: 13px; color: var(--color-text-muted);">${emp.cargo || 'Cargo não especificado'} · ${emp.setor || 'Setor não especificado'} · <span style="color:var(--color-success); font-weight:600;">${salarioView}</span></p>
+              <p class="mono" style="font-size:11px; color:var(--color-text-muted);">CTPS: ${emp.ctps_numero || '-'} · PIS: ${emp.pis_pasep || '-'} · Salário fixo do cargo: ${salarioView}</p>
             </div>
           </div>
           <span class="vinculo-badge ${vinculoClass}">${vinculo}</span>
@@ -941,6 +1207,14 @@ document.addEventListener('DOMContentLoaded', function() {
               <div>${docLink(emp.comprovante_endereco_url,'Comprovante Endereço')}</div>
               <div style="grid-column:1/-1;">${docLink(emp.ctps_doc_url,'Carteira de Trabalho — Cópia')}</div>
             </div>
+          </div>
+           <div>
+            <span style="color: var(--color-text-muted); display: block; margin-bottom: 2px;">Salário (fixo do cargo):</span>
+            <strong style="color:var(--color-success);">${salarioView}</strong>
+          </div>
+          <div style="grid-column:1/-1; background:#FFFCF5; border:1px solid var(--color-gold-light); padding:12px;">
+            <span style="color: var(--color-text-muted); display: block; margin-bottom: 8px; font-weight:600;">Arquivos diversos — Certificados / Docs filhos:</span>
+            <div>${diversosHtml}</div>
           </div>
           <div>
             <span style="color: var(--color-text-muted); display: block; margin-bottom: 2px;">Status no Fluxo:</span>
@@ -970,13 +1244,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (emp) openEditModal(emp);
   };
 
-  let viewModalEmployeeId = null;
-  // sobrescreve para guardar id atual
-  const _origView = window.viewEmployeeDetail;
-  window.viewEmployeeDetail = function(id){
-    viewModalEmployeeId = id;
-    return _origView(id);
-  };
 
   async function getImageDataUrl(url){
     try{
@@ -1046,6 +1313,12 @@ document.addEventListener('DOMContentLoaded', function() {
       y += Math.max(5, lines.length*4 + 1);
     }
 
+    section('Cargo / Função — Salário fixo');
+    row('Cargo', emp.cargo || '-');
+    row('Setor', emp.setor || '-');
+    row('Salário (fixo do cargo)', emp.salario!=null ? formatMoneyBRL(emp.salario) : '-');
+    if(emp.cargo_id){ const p = positions.find(x=> String(x.id)===String(emp.cargo_id)); if(p) row('Salário base do cargo', formatMoneyBRL(p.salario_base)); }
+
     section('Dados pessoais');
     row('CPF', formatCPF(emp.cpf));
     row('RG', formatRG(emp.rg) || '-');
@@ -1078,6 +1351,12 @@ document.addEventListener('DOMContentLoaded', function() {
         doc.setTextColor(46,42,36);
       }
     });
+    // arquivos diversos
+    let pdfDiversos = [];
+    try{ const { data } = await supabaseClient.from('employee_documents').select('*').eq('employee_id', emp.id).order('created_at'); pdfDiversos = data||[]; }catch(e){}
+    section('Arquivos diversos — Certificados / Docs filhos');
+    if(pdfDiversos.length===0) row('Arquivos diversos', 'nenhum');
+    else pdfDiversos.forEach(d=>{ row((d.tipo==='certificado'?'Certificado': d.tipo==='doc_filho'?'Doc. filho':'Outro')+' — '+d.titulo, d.url || '-'); });
 
     section('Metadados');
     row('ID', String(emp.id));
@@ -1128,5 +1407,23 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // Inicializar busca
+  fetchPositions();
   fetchEmployees();
+  // ESC também fecha cargo modal
+  window.addEventListener('keydown', function(e){
+    if(e.key==='Escape'){
+      const cargoModalEl=document.getElementById('cargoModal');
+      if(cargoModalEl && cargoModalEl.classList.contains('active')){
+        if(window.BiofirmAnimations) window.BiofirmAnimations.closeModalAnimated(cargoModalEl);
+        else cargoModalEl.classList.remove('active');
+      }
+    }
+  });
+  window.addEventListener('click', function(e){
+    const cargoModalEl=document.getElementById('cargoModal');
+    if(e.target===cargoModalEl){
+      if(window.BiofirmAnimations) window.BiofirmAnimations.closeModalAnimated(cargoModalEl);
+      else cargoModalEl.classList.remove('active');
+    }
+  });
 });
