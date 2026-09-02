@@ -2,7 +2,7 @@
 
 > **Sistema de Cadastro e Gestão de Colaboradores**  
 > Documento de rastreabilidade, status de entregas e planejamento de próximas etapas com base no [PRD.md](file:///c:/Biofirme/PRD.md) e requisitos operacionais.  
-> **Última atualização:** 31/08/2026 23:00 — Cadastro completo + compressão + Storage
+> **Última atualização:** 02/09/2026 03:00 — Cargos com salário fixo + Arquivos diversos + Responsividade
 
 ---
 
@@ -25,10 +25,11 @@ gantt
     Cadastro completo + compressão (foto, CTPS/PIS, 5 anexos) :done, des5b, 2026-08-31, 2026-08-31
     section Fase 4: Documentos & Colaborador
     Upload Storage + compressão (employee-docs 1GB) :done, des6, 2026-08-31, 2026-08-31
+    Cargos c/ salário fixo + arquivos diversos :done, des6b, 2026-09-02, 2026-09-02
+    Responsividade (hamburger 480/640/768/1024) :done, des6c, 2026-09-02, 2026-09-02
     Painel do Colaborador         :des7, 2026-09-09, 2026-09-14
     section Fase 5: Exportação & Gestão
-    Exportação PDF para Contabilidade :des8, 2026-09-15, 2026-09-20
-    CRUD de Cargos e Setores      :des9, 2026-09-21, 2026-09-25
+    Exportação PDF para Contabilidade :done, des8, 2026-09-02, 2026-09-02
     Reset de Senha por Gestor     :des10, 2026-09-26, 2026-09-28
     section Fase 6: PWA & Compliance
     LGPD & Termo de Consentimento :des11, 2026-09-29, 2026-10-02
@@ -44,8 +45,8 @@ gantt
 | **Fase 1** | Fundação, Banco Supabase & Identidade Visual | ✅ **Concluído** | 100% |
 | **Fase 2** | Backend Supabase Auth + RLS | ✅ **Concluído** | 100% |
 | **Fase 3** | Dashboard, CRUD, Validações & Máscaras + Cadastro completo | ✅ **Concluído (31/08)** | 100% |
-| **Fase 4** | Storage + compressão (foto, 5 docs) ✅ / Painel colaborador pendente | 🔄 **Em progresso** | 60% |
-| **Fase 5** | Exportação PDF, Gestão de Cargos/Setores | 📋 **Planejado** | 0% |
+| **Fase 4** | Storage + compressão + Cargos c/ salário fixo + Arquivos diversos + Responsividade ✅ / Painel colaborador pendente | 🔄 **Em progresso** | 85% |
+| **Fase 5** | Exportação PDF (com salário/diversos) ✅ / Reset senha pendente | 🔄 **Em progresso** | 50% |
 | **Fase 6** | PWA & Compliance (LGPD) | 📋 **Planejado** | 0% |
 
 ---
@@ -142,40 +143,45 @@ gantt
 
 ---
 
-## 🔄 Fase 4: Storage + Compressão ✅ + Painel do Colaborador (Em progresso — 31/08/2026, 60%)
+## 🔄 Fase 4: Storage + Compressão ✅ + Cargos/Salário + Arquivos Diversos + Responsividade (Em progresso — 02/09/2026, 85%)
 
 ### Entregas 31/08 (concluído)
 - ✅ Bucket `storage.buckets:employee-docs` público, 10MB limite, `jpeg/png/webp/pdf/heic` + policies `employee_docs_authenticated_all` / `public_read` (`create_employee_docs_bucket`)
 - ✅ `js/compress.js` canvas WebP/JPEG (1280px, 0.72) — economia 1GB (~2000 fotos vs ~250)
 - ✅ Cadastro completo no `dashboard.html` (foto + 5 anexos com preview/compressão) + `js/dashboard.js` upload `supabase.storage.from('employee-docs').upload()`
 
+### Entregas 02/09 (concluído)
+- ✅ **Cargos com salário fixo herdado** (`dashboard.html:190`, `js/dashboard.js:143`, `public.positions`): tabela `positions` (nome unique, setor, salario_base, RLS admin/gestor/manager), `employees.cargo_id FK + salario + salario_moeda`, trigger `sync_salario_from_position` (herança automática), `Cargo/Função *` virou `<select>` com `Salário readonly` (`maskMoney`), modal `Cargos & Setores` CRUD (criar/editar/excluir), ficha lateral/view/PDF com `R$`
+- ✅ **Arquivos diversos** (`dashboard.html:271`, `js/dashboard.js:796`, `public.employee_documents`): tabela `employee_documents` (tipo `certificado/doc_filho/outro`, titulo, url em `employee-docs/diversos/`, RLS), fieldset com `Tipo/Título/Arquivo` + `+ Adicionar`, fila `pendingDiversos` para criação e envio imediato em edição, lista com remover, exibição na ficha/PDF
+- ✅ **Responsividade** (`css/style.css:885`, `dashboard.html:22`, `js/dashboard.js:795`): hamburger `btnMobileNav` (☰/✕) `<768px` com `app-nav.open` dropdown, breakpoints 1024/768/640/480, filtros empilhados (`min-height 44px`), tabela `min-width 620px` scroll swipe, modais `max-height 94vh` margens 12px, touch targets 44px, `font-size 16px` evita zoom iOS
+
 ### Objetivos restantes
 - [x] Configurar Supabase Storage para upload de documentos
 - [x] Upload de fotos e documentos (PDF, JPEG) com limite de 10MB + compressão
 - [x] Visualização de anexos no detalhe do funcionário (ficha lateral + modal)
+- [x] CRUD Cargos com salário fixo + Arquivos diversos
+- [x] Responsividade (hamburger 480/640/768/1024)
 - [ ] Painel do colaborador (rota `/colaborador.html`)
   - Login com credenciais de colaborador
   - Visualização e edição dos próprios dados
-  - Upload de documentos pessoais
+  - Upload de documentos pessoais (inclui `employee_documents`)
   - Policy RLS: colaborador edita apenas próprio registro
 
 ### Dependências
-- Supabase Storage buckets configurados
-- Policy RLS para `user` role em employees
+- Supabase Storage buckets configurados (inclui `diversos/`)
+- Policy RLS para `user` role em employees + `positions`/`employee_documents`
 
 ---
 
-## 📋 Fase 5: Exportação PDF & Gestão de Cargos/Setores (Planejado - Set/2026)
+## 🔄 Fase 5: Exportação PDF ✅ + Reset de Senha (Em progresso - 02/09/2026, 50%)
 
 ### Objetivos
-- [ ] Exportação de ficha do funcionário em PDF (via biblioteca jsPDF ou Puppeteer)
-- [ ] Template de PDF para contabilidade com todos os dados + anexos
-- [ ] CRUD de Cargos e Setores (tabelas auxiliares)
-- [ ] Dropdown dinâmico no formulário de funcionário
+- [x] Exportação de ficha do funcionário em PDF (`js/dashboard.js:1314` via `jsPDF`): foto + 5 docs + **salário fixo do cargo** (`positions.salario_base`/`employees.salario`) + **arquivos diversos** (`employee_documents` links) — seção `Cargo/Função — Salário fixo` + `Arquivos diversos` já em produção
+- [x] CRUD de Cargos e Setores com salário fixo (`public.positions`, `dashboard.html:190` select + `cargoModal`) — concluído 02/09 (dropdown herdando salário)
 - [ ] Reset de senha por gestor (gera senha temporária, colaborador troca no primeiro login)
 
 ### Dependências
-- Tabelas `cargos` e `setores`
+- Tabela `positions` (já criada) — `setores` desnormalizado em `positions.setor`
 - Edge Function para reset de senha
 
 ---
@@ -195,22 +201,22 @@ gantt
 
 ---
 
-## 🔧 Stack Tecnológica Final (31/08/2026)
+## 🔧 Stack Tecnológica Final (02/09/2026)
 
 | Camada | Tecnologia |
 |--------|------------|
-| **Frontend** | HTML5 + CSS3 + JavaScript vanilla + `js/compress.js` (canvas WebP) |
-| **Backend** | Supabase (PostgreSQL + Auth + RLS + Edge Functions + Storage `employee-docs`) |
+| **Frontend** | HTML5 + CSS3 + JavaScript vanilla + `js/mask.js` (`maskMoney`) + `js/compress.js` (canvas WebP) + responsividade hamburger/breakpoints 480/640/768/1024 (`css/style.css:885`) |
+| **Backend** | Supabase (PostgreSQL + Auth + RLS + Edge Functions + Storage `employee-docs` com subpastas `foto/diversos` + `positions`/`employee_documents` + trigger `sync_salario_from_position`) |
 | **Autenticação** | Supabase Auth (JWT automático) |
-| **Storage** | Supabase Storage `employee-docs` (público, 10MB, compressão ~75% para 1GB) |
+| **Storage** | Supabase Storage `employee-docs` (público, 10MB, `jpeg/png/webp/pdf/heic`, subpastas `foto/*` e `diversos/*`, compressão ~75% para 1GB) |
 | **Hospedagem** | Vercel (frontend) + Supabase (backend) |
-| **Validações** | ViaCEP + CPF/RG 7-13/CTPS/PIS máscaras |
+| **Validações** | ViaCEP + CPF/RG 7-13/CTPS/PIS máscaras + `cargo_id` obrigatório + `maskMoney` |
 
 ---
 
 ## 📝 Notas de Implementação
 
-### Migrations Aplicadas (até 31/08/2026)
+### Migrations Aplicadas (até 02/09/2026)
 1. `20260101000000_align_users_employees_structure` - Constraints, índices, trigger updated_at
 2. `20260101000100_rls_policies` - Policies RLS iniciais + grants
 3. `20260101000200_security_definer_fix` - Revoga acesso anon a funções sensíveis
@@ -220,14 +226,15 @@ gantt
 7. `20260101000600_add_employee_address_fields` - Colunas endereço (rg, data_nascimento, telefone, email, cep, logradouro, numero, complemento, bairro, cidade, uf)
 8. `add_cadastro_completo_foto_docs` (31/08) - `foto_url`, `ctps_numero`, `pis_pasep`, `rg_frente_url`, `rg_verso_url`, `cpf_doc_url`, `comprovante_endereco_url`, `ctps_doc_url` + fix CHECKs + índices pis/ctps
 9. `create_employee_docs_bucket` (31/08) - Bucket `employee-docs` público 10MB + policies
+10. `add_positions_salario_e_docs_diversos` (02/09) - `positions` (nome unique, setor, salario_base, triggers/RLS) + `employees.cargo_id/salario/salario_moeda` + trigger `sync_salario_from_position` + backfill + `employee_documents` (tipo/titulo/url, RLS)
 
-### Arquivos Principais (31/08)
-- `index.html` - Login
-- `dashboard.html` - Dashboard + cadastro completo (foto, CTPS/PIS, 5 anexos)
-- `css/style.css` - Design System + file inputs documentais
+### Arquivos Principais (02/09)
+- `index.html` - Login (viewport responsivo)
+- `dashboard.html` - Dashboard + cadastro completo (foto, CTPS/PIS, 5 anexos) + cargos/salário (select + cargoModal) + arquivos diversos + hamburger
+- `css/style.css` - Design System + file inputs documentais + responsividade (hamburger, breakpoints 480/640/768/1024)
 - `js/app.js` - Login
-- `js/dashboard.js` - CRUD + uploads comprimidos + ficha com docs
-- `js/mask.js` - Máscaras (CPF, RG 7-13, CTPS, PIS, CEP, telefone)
+- `js/dashboard.js` - CRUD + positions/salário herdado + arquivos diversos + hamburger + ficha/PDF com salário/diversos
+- `js/mask.js` - Máscaras (CPF, RG 7-13, CTPS, PIS, CEP, telefone, money)
 - `js/compress.js` - Compressão canvas WebP/JPEG para 1GB
 - `js/supabase.js` - Client Supabase
 - `.env` - SUPABASE_URL / KEYS
@@ -243,12 +250,12 @@ http://localhost:8080
 
 ---
 
-## 🎯 Próximos Passos Imediatos (31/08)
+## 🎯 Próximos Passos Imediatos (02/09)
 
-1. **Deploy Vercel** (frontend com cadastro completo já pronto)
-2. **Painel do colaborador** `/colaborador.html` com RLS por `auth.uid()` (reutiliza `employee-docs`)
-3. **Exportação PDF** ficha com foto + 5 anexos para contabilidade
-4. **CRUD Cargos/Setores** + validação CTPS/PIS digito
+1. **Deploy Vercel** (frontend com cargos/salário + arquivos diversos + responsividade — já em produção `68ac274`)
+2. **Painel do colaborador** `/colaborador.html` com RLS por `auth.uid()` (reutiliza `employee-docs` + `employee_documents`)
+3. **Refinar PDF contábil** com layout de salário/diversos validado com RH
+4. **Validação CTPS/PIS dígito** + LGPD/PWA (Fase 6)
 
 ---
 
