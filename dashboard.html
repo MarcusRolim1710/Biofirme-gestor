@@ -9,7 +9,7 @@
    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.4"></script>
      <script src="js/supabase.js"></script>
      <script src="js/mask.js" defer></script>
      <script src="js/compress.js" defer></script>
@@ -28,7 +28,6 @@
       <nav class="app-nav" id="appNav">
         <a href="dashboard.html" class="nav-link active">Funcionários</a>
         <a href="#" class="nav-link" id="navCargos">Cargos & Setores</a>
-        <a href="#relatorios" class="nav-link">Relatórios</a>
       </nav>
       <div class="app-user">
         <div class="user-info">
@@ -61,16 +60,16 @@
             <!-- Barra de Filtros -->
             <div class="filters">
               <div class="filter-search-wrap">
-                <input type="text" id="searchInput" placeholder="Buscar por nome, CPF ou cargo..." class="filter-input">
+                <input type="search" id="searchInput" placeholder="Buscar por nome, CPF ou cargo..." class="filter-input" aria-label="Buscar por nome, CPF ou cargo">
               </div>
-              <select id="filterStatus" class="filter-select">
+              <select id="filterStatus" class="filter-select" aria-label="Filtrar por status de cadastro">
                 <option value="">Todos os Status de Cadastro</option>
                 <option value="Sem dados">Sem dados</option>
                 <option value="Pendente de Documentos">Pendente de Documentos</option>
                 <option value="Aprovado pelo RH">Aprovado pelo RH</option>
                 <option value="Enviado para Contabilidade">Enviado para Contabilidade</option>
               </select>
-              <select id="filterVinculo" class="filter-select">
+              <select id="filterVinculo" class="filter-select" aria-label="Filtrar por vínculo">
                 <option value="">Todos os Vínculos</option>
                 <option value="Ativo">Ativo</option>
                 <option value="Inativo">Inativo</option>
@@ -83,12 +82,12 @@
               <table class="employee-table">
                 <thead>
                   <tr>
-                    <th>Colaborador</th>
-                    <th>CPF</th>
-                    <th>Cargo / Setor</th>
-                    <th>Fluxo de Cadastro</th>
-                    <th>Vínculo</th>
-                    <th>Ações</th>
+                    <th scope="col">Colaborador</th>
+                    <th scope="col">CPF</th>
+                    <th scope="col">Cargo / Setor</th>
+                    <th scope="col">Fluxo de Cadastro</th>
+                    <th scope="col">Vínculo</th>
+                    <th scope="col">Ações</th>
                   </tr>
                 </thead>
                 <tbody id="employeeList">
@@ -132,7 +131,7 @@
               <h2 class="card-title">Detalhes do Colaborador</h2>
             </div>
             <div id="detailContent" class="detail-box">
-              <p class="empty-state-text" style="font-size: 13px; color: var(--color-text-muted); text-align: center;">
+              <p class="detail-empty-text">
                 Selecione um funcionário na tabela para visualizar a ficha rápida e exportação.
               </p>
             </div>
@@ -146,11 +145,11 @@
   </div>
 
   <!-- Modal de Criação / Edição de Funcionário -->
-  <div class="modal-backdrop" id="employeeModal">
+  <div class="modal-backdrop" id="employeeModal" role="dialog" aria-modal="true" aria-labelledby="modalFormTitle">
     <div class="modal-card">
       <div class="modal-header">
         <h2 class="modal-title" id="modalFormTitle">Novo Colaborador</h2>
-        <button class="modal-close" id="btnCloseModal">&times;</button>
+        <button class="modal-close" id="btnCloseModal" aria-label="Fechar">&times;</button>
       </div>
       <form id="employeeForm">
         <input type="hidden" id="empId">
@@ -158,13 +157,13 @@
           <!-- Foto de Perfil — escolha Upload ou Câmera -->
           <div class="field full-width">
             <label>Foto de Perfil</label>
-            <div style="display:flex; align-items:center; gap:16px;">
-              <div id="fotoPreviewWrap" style="width:72px; height:72px; border-radius:50%; border:2px solid var(--color-gold-light); background:#F0E6CE url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2272%22 height=%2272%22><text x=%2250%%22 y=%2255%%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 font-size=%2228%22 fill=%22%238F7A3A%22>?</text></svg>') center/cover no-repeat; overflow:hidden; flex-shrink:0; cursor:pointer;" title="Clique para alterar foto"></div>
-              <div style="flex:1;">
-                <button type="button" id="btnFotoChoice" class="btn-secondary btn-small" style="width:100%; justify-content:center;">📷 Anexar foto — escolher origem</button>
-                <input type="file" id="empFoto" accept="image/*" style="display:none;">
+            <div class="foto-row">
+              <div id="fotoPreviewWrap" class="foto-preview-wrap" title="Clique para alterar foto"></div>
+              <div class="flex-1">
+                <button type="button" id="btnFotoChoice" class="btn-secondary btn-small btn-full">📷 Anexar foto — escolher origem</button>
+                <input type="file" id="empFoto" accept="image/*" class="hidden">
                 <input type="hidden" id="empFotoUrl">
-                <div id="fotoInfo" style="font-size:11px; color:var(--color-text-muted); margin-top:6px;">JPG/PNG/WebP até 10MB — compressão automática para 1GB</div>
+                <div id="fotoInfo" class="hint-text mt-6">JPG/PNG/WebP até 10MB — compressão automática para 1GB</div>
               </div>
             </div>
           </div>
@@ -190,26 +189,26 @@
           </div>
           <div class="field">
             <label for="empCargo">Cargo / Função *</label>
-            <div style="display:flex; gap:8px;">
-              <select id="empCargo" style="flex:1;">
+            <div class="flex-gap-8">
+              <select id="empCargo" class="flex-1">
                 <option value="">Selecione o cargo</option>
               </select>
-              <button type="button" id="btnManageCargos" class="btn-secondary btn-small" title="Gerenciar cargos" style="white-space:nowrap;">⚙ Cargos</button>
+              <button type="button" id="btnManageCargos" class="btn-secondary btn-small nowrap" title="Gerenciar cargos">⚙ Cargos</button>
             </div>
-            <span style="font-size:11px; color:var(--color-text-muted);" id="cargoSalarioInfo">Salário fixo definido no cargo — herdado automaticamente</span>
+            <span class="hint-text" id="cargoSalarioInfo">Salário fixo definido no cargo — herdado automaticamente</span>
           </div>
           <div class="field">
             <label for="empSalario">Salário (herdado do cargo)</label>
-            <input type="text" id="empSalario" data-mask="money" placeholder="R$ 0,00" readonly style="background:#F8F3E6; cursor:not-allowed;">
+            <input type="text" id="empSalario" data-mask="money" placeholder="R$ 0,00" readonly class="input-readonly">
           </div>
           <div class="field full-width" style="display:none;" id="fieldSetorManual">
             <label for="empSetor">Setor</label>
-            <input type="text" id="empSetor" placeholder="Ex: Laboratório / Produção" readonly style="background:#F8F3E6;">
-            <span style="font-size:11px; color:var(--color-text-muted);">Setor vem do cargo selecionado</span>
+            <input type="text" id="empSetor" placeholder="Ex: Laboratório / Produção" readonly class="input-readonly">
+            <span class="hint-text">Setor vem do cargo selecionado</span>
           </div>
-          <fieldset class="field full-width" style="border: 1px solid var(--color-gold-light); border-radius: 8px; padding: 12px; margin-top: 4px;">
-            <legend style="font-size: 12px; color: var(--color-text-muted); font-weight: 500; padding: 0 8px;">Endereço</legend>
-            <div class="form-grid" style="margin-top: 8px;">
+          <fieldset class="field full-width form-fieldset">
+            <legend class="form-legend">Endereço</legend>
+            <div class="form-grid mt-8">
               <div class="field">
                 <label for="empCep">CEP</label>
                 <input type="text" id="empCep" data-mask="cep" placeholder="00000-000" maxlength="9" autocomplete="off">
@@ -270,10 +269,10 @@
             </div>
           </fieldset>
           <!-- Arquivos Diversos — Certificados, Docs Filhos, Outros -->
-          <fieldset class="field full-width" style="border: 1px solid var(--color-gold-light); border-radius: 8px; padding: 12px; margin-top: 4px;">
-            <legend style="font-size: 12px; color: var(--color-text-muted); font-weight: 500; padding: 0 8px;">Arquivos Diversos — Certificados, Documentos dos Filhos, Outros</legend>
-            <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; margin-top:8px;">
-              <div class="field" style="min-width:140px; flex:1;">
+          <fieldset class="field full-width form-fieldset">
+            <legend class="form-legend">Arquivos Diversos — Certificados, Documentos dos Filhos, Outros</legend>
+            <div class="diversos-form-row">
+              <div class="field diversos-field-tipo">
                 <label for="divDocTipo">Tipo</label>
                 <select id="divDocTipo">
                   <option value="certificado">Certificado (curso superior, etc.)</option>
@@ -281,58 +280,58 @@
                   <option value="outro">Outro</option>
                 </select>
               </div>
-              <div class="field" style="min-width:160px; flex:1.4;">
+              <div class="field diversos-field-titulo">
                 <label for="divDocTitulo">Título / Descrição</label>
                 <input type="text" id="divDocTitulo" placeholder="Ex: Diploma Superior — Farmácia">
               </div>
-              <div class="field" style="min-width:160px; flex:1;">
+              <div class="field diversos-field-file">
                 <label for="divDocFile">Arquivo (imagem/PDF até 10MB)</label>
                 <input type="file" id="divDocFile" accept="image/*,application/pdf">
               </div>
-              <button type="button" id="btnAddDiverso" class="btn-secondary btn-small" style="height:38px;">+ Adicionar</button>
+              <button type="button" id="btnAddDiverso" class="btn-secondary btn-small btn-h38">+ Adicionar</button>
             </div>
-            <div id="divDocInfo" style="font-size:11px; color:var(--color-text-muted); margin-top:6px;"></div>
-            <ul id="docDiversosList" style="list-style:none; padding:0; margin:10px 0 0; display:flex; flex-direction:column; gap:6px;"></ul>
-            <p style="font-size:11px; color:var(--color-text-muted); margin-top:6px;">Cada arquivo será salvo em <code>employee-docs/diversos/</code>. Ao editar um funcionário já salvo, os arquivos são enviados imediatamente.</p>
+            <div id="divDocInfo" class="hint-text mt-6"></div>
+            <ul id="docDiversosList" class="diversos-list"></ul>
+            <p class="hint-text mt-6">Cada arquivo será salvo em <code>employee-docs/diversos/</code>. Ao editar um funcionário já salvo, os arquivos são enviados imediatamente.</p>
           </fieldset>
           <!-- Documentação Anexa (com compressão) -->
-          <fieldset class="field full-width" style="border: 1px solid var(--color-gold-light); border-radius: 8px; padding: 12px; margin-top: 4px;">
-            <legend style="font-size: 12px; color: var(--color-text-muted); font-weight: 500; padding: 0 8px;">Documentação — Anexos (imagem ou PDF, até 10MB cada, compressão automática)</legend>
-            <div class="form-grid" style="margin-top: 8px;">
+          <fieldset class="field full-width form-fieldset">
+            <legend class="form-legend">Documentação — Anexos (imagem ou PDF, até 10MB cada, compressão automática)</legend>
+            <div class="form-grid mt-8">
               <div class="field">
                 <label for="empRgFrente">RG — Frente *</label>
                 <input type="file" id="empRgFrente" accept="image/*,application/pdf">
-                <span class="file-info" id="infoRgFrente" style="font-size:11px; color:var(--color-text-muted);"></span>
+                <span class="file-info" id="infoRgFrente"></span>
                 <input type="hidden" id="empRgFrenteUrl">
-                <div id="previewRgFrente" style="margin-top:6px; display:none;"><img style="max-width:100%; max-height:120px; border:1px solid var(--color-gold-light);"></div>
+                <div id="previewRgFrente" class="doc-preview"><img alt="Pré-visualização de RG — Frente"></div>
               </div>
               <div class="field">
                 <label for="empRgVerso">RG — Verso *</label>
                 <input type="file" id="empRgVerso" accept="image/*,application/pdf">
-                <span class="file-info" id="infoRgVerso" style="font-size:11px; color:var(--color-text-muted);"></span>
+                <span class="file-info" id="infoRgVerso"></span>
                 <input type="hidden" id="empRgVersoUrl">
-                <div id="previewRgVerso" style="margin-top:6px; display:none;"><img style="max-width:100%; max-height:120px; border:1px solid var(--color-gold-light);"></div>
+                <div id="previewRgVerso" class="doc-preview"><img alt="Pré-visualização de RG — Verso"></div>
               </div>
               <div class="field">
                 <label for="empCpfDoc">CPF — Cópia</label>
                 <input type="file" id="empCpfDoc" accept="image/*,application/pdf">
-                <span class="file-info" id="infoCpfDoc" style="font-size:11px; color:var(--color-text-muted);"></span>
+                <span class="file-info" id="infoCpfDoc"></span>
                 <input type="hidden" id="empCpfDocUrl">
-                <div id="previewCpfDoc" style="margin-top:6px; display:none;"><img style="max-width:100%; max-height:120px; border:1px solid var(--color-gold-light);"></div>
+                <div id="previewCpfDoc" class="doc-preview"><img alt="Pré-visualização de CPF"></div>
               </div>
               <div class="field">
                 <label for="empCompEnd">Comprovante de Endereço</label>
                 <input type="file" id="empCompEnd" accept="image/*,application/pdf">
-                <span class="file-info" id="infoCompEnd" style="font-size:11px; color:var(--color-text-muted);"></span>
+                <span class="file-info" id="infoCompEnd"></span>
                 <input type="hidden" id="empCompEndUrl">
-                <div id="previewCompEnd" style="margin-top:6px; display:none;"><img style="max-width:100%; max-height:120px; border:1px solid var(--color-gold-light);"></div>
+                <div id="previewCompEnd" class="doc-preview"><img alt="Pré-visualização de Comprovante de Endereço"></div>
               </div>
               <div class="field full-width">
                 <label for="empCtpsDoc">Carteira de Trabalho — Cópia</label>
                 <input type="file" id="empCtpsDoc" accept="image/*,application/pdf">
-                <span class="file-info" id="infoCtpsDoc" style="font-size:11px; color:var(--color-text-muted);"></span>
+                <span class="file-info" id="infoCtpsDoc"></span>
                 <input type="hidden" id="empCtpsDocUrl">
-                <div id="previewCtpsDoc" style="margin-top:6px; display:none;"><img style="max-width:100%; max-height:120px; border:1px solid var(--color-gold-light);"></div>
+                <div id="previewCtpsDoc" class="doc-preview"><img alt="Pré-visualização de CTPS"></div>
               </div>
             </div>
           </fieldset>
@@ -363,11 +362,11 @@
   </div>
 
   <!-- Modal de Visualização de Ficha Cadastral -->
-  <div class="modal-backdrop" id="viewModal">
+  <div class="modal-backdrop" id="viewModal" role="dialog" aria-modal="true" aria-labelledby="viewModalTitle">
     <div class="modal-card">
       <div class="modal-header">
-        <h2 class="modal-title">Ficha Cadastral do Colaborador</h2>
-        <button class="modal-close" id="btnCloseViewModal">&times;</button>
+        <h2 class="modal-title" id="viewModalTitle">Ficha Cadastral do Colaborador</h2>
+        <button class="modal-close" id="btnCloseViewModal" aria-label="Fechar">&times;</button>
       </div>
       <div id="viewModalContent">
         <!-- Renderizado dinamicamente -->
@@ -380,29 +379,29 @@
   </div>
 
   <!-- Modal Cargos & Setores — Salário fixo por função -->
-  <div class="modal-backdrop" id="cargoModal">
-    <div class="modal-card" style="max-width:640px;">
+  <div class="modal-backdrop" id="cargoModal" role="dialog" aria-modal="true" aria-labelledby="cargoModalTitle">
+    <div class="modal-card modal-card-md">
       <div class="modal-header">
-        <h2 class="modal-title">Cargos & Setores — Salário fixo</h2>
-        <button class="modal-close" id="btnCloseCargoModal">&times;</button>
+        <h2 class="modal-title" id="cargoModalTitle">Cargos & Setores — Salário fixo</h2>
+        <button class="modal-close" id="btnCloseCargoModal" aria-label="Fechar">&times;</button>
       </div>
-      <p style="font-size:13px; color:var(--color-text-muted); margin-bottom:14px;">Cada cargo tem um <strong>salário fixo</strong>. Ao vincular um funcionário ao cargo, o salário é herdado automaticamente (trigger <code>sync_salario_from_position</code>).</p>
-      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; align-items:flex-end;">
-        <div class="field" style="flex:1.2; min-width:160px;">
+      <p class="cargo-modal-note">Cada cargo tem um <strong>salário fixo</strong>. Ao vincular um funcionário ao cargo, o salário é herdado automaticamente (trigger <code>sync_salario_from_position</code>).</p>
+      <div class="cargo-form-row">
+        <div class="field cargo-field-nome">
           <label for="cargoNome">Nome do cargo *</label>
           <input type="text" id="cargoNome" placeholder="Ex: Farmacêutico(a)">
         </div>
-        <div class="field" style="flex:1; min-width:140px;">
+        <div class="field cargo-field-setor">
           <label for="cargoSetor">Setor</label>
           <input type="text" id="cargoSetor" placeholder="Ex: Laboratório">
         </div>
-        <div class="field" style="flex:0.8; min-width:130px;">
+        <div class="field cargo-field-salario">
           <label for="cargoSalario">Salário fixo *</label>
           <input type="text" id="cargoSalario" data-mask="money" placeholder="R$ 0,00">
         </div>
-        <button type="button" id="btnSaveCargo" class="btn-primary btn-small" style="height:38px;">Salvar cargo</button>
+        <button type="button" id="btnSaveCargo" class="btn-primary btn-small btn-h38">Salvar cargo</button>
       </div>
-      <div id="cargoList" style="border:1px solid var(--color-gold-light); background:#FFFDF9; max-height:260px; overflow:auto;"></div>
+      <div id="cargoList" class="cargo-list-box"></div>
       <div class="modal-actions">
         <button type="button" class="btn-secondary" id="btnCloseCargoBtn">Fechar</button>
       </div>
@@ -410,29 +409,29 @@
   </div>
 
   <!-- Modal escolha foto: Upload vs Câmera -->
-  <div class="modal-backdrop" id="fotoChoiceModal">
-    <div class="modal-card" style="max-width:420px; padding:24px;">
-      <div class="modal-header" style="margin-bottom:16px;">
-        <h2 class="modal-title" style="font-size:18px;">Anexar foto de perfil</h2>
-        <button class="modal-close" id="btnCloseFotoChoice">&times;</button>
+  <div class="modal-backdrop" id="fotoChoiceModal" role="dialog" aria-modal="true" aria-labelledby="fotoChoiceModalTitle">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-header modal-header-tight">
+        <h2 class="modal-title modal-title-sm" id="fotoChoiceModalTitle">Anexar foto de perfil</h2>
+        <button class="modal-close" id="btnCloseFotoChoice" aria-label="Fechar">&times;</button>
       </div>
-      <div id="fotoChoiceOptions" style="display:flex; flex-direction:column; gap:10px;">
-        <button type="button" class="btn-secondary" id="btnFotoUpload" style="justify-content:center; padding:14px;">📁 Escolher arquivo do dispositivo</button>
-        <button type="button" class="btn-primary" id="btnFotoCamera" style="justify-content:center; padding:14px;">📷 Abrir câmera</button>
-        <p style="font-size:11px; color:var(--color-text-muted); text-align:center;">Imagem será comprimida (WebP 0.72, max 800px) para economizar Storage</p>
+      <div id="fotoChoiceOptions" class="stack-10">
+        <button type="button" class="btn-secondary btn-block" id="btnFotoUpload">📁 Escolher arquivo do dispositivo</button>
+        <button type="button" class="btn-primary btn-block" id="btnFotoCamera">📷 Abrir câmera</button>
+        <p class="hint-text text-center">Imagem será comprimida (WebP 0.72, max 800px) para economizar Storage</p>
       </div>
-      <div id="fotoCameraArea" style="display:none; flex-direction:column; gap:12px;">
-        <video id="fotoVideo" autoplay playsinline style="width:100%; border-radius:8px; background:#000; max-height:260px; object-fit:cover;"></video>
-        <canvas id="fotoCanvas" style="display:none;"></canvas>
-        <div style="display:flex; gap:8px;">
-          <button type="button" class="btn-secondary" id="btnFotoBack" style="flex:1;">Voltar</button>
-          <button type="button" class="btn-primary" id="btnFotoCapture" style="flex:1;">Capturar</button>
+      <div id="fotoCameraArea" class="stack-12" style="display:none;">
+        <video id="fotoVideo" autoplay playsinline class="foto-video"></video>
+        <canvas id="fotoCanvas" class="hidden"></canvas>
+        <div class="flex-gap-8">
+          <button type="button" class="btn-secondary flex-1" id="btnFotoBack">Voltar</button>
+          <button type="button" class="btn-primary flex-1" id="btnFotoCapture">Capturar</button>
         </div>
-        <div id="fotoCapturePreview" style="display:none; text-align:center;">
-          <img id="fotoCaptureImg" style="max-width:100%; border-radius:8px; border:1px solid var(--color-gold-light);">
-          <div style="display:flex; gap:8px; margin-top:10px;">
-            <button type="button" class="btn-secondary" id="btnFotoRetake" style="flex:1;">Refazer</button>
-            <button type="button" class="btn-primary" id="btnFotoConfirm" style="flex:1;">Usar esta foto</button>
+        <div id="fotoCapturePreview" class="text-center" style="display:none;">
+          <img id="fotoCaptureImg" class="foto-preview-img" alt="Pré-visualização da foto capturada">
+          <div class="flex-gap-8 mt-10">
+            <button type="button" class="btn-secondary flex-1" id="btnFotoRetake">Refazer</button>
+            <button type="button" class="btn-primary flex-1" id="btnFotoConfirm">Usar esta foto</button>
           </div>
         </div>
       </div>

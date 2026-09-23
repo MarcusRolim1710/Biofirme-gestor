@@ -30,12 +30,39 @@ document.addEventListener('DOMContentLoaded', function() {
     return parts.join(' · ');
   }
 
+  // Segurança: escape de dados vindos do banco antes de injetar em innerHTML (anti-XSS)
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // Mensagens de erro amigáveis (não vaza detalhes internos do Supabase)
+  function friendlyError(err) {
+    const msg = (err && err.message) || String(err || '');
+    if (/duplicate key|23505/i.test(msg)) return 'CPF já cadastrado para outro colaborador.';
+    if (/row[- ]level security/i.test(msg)) return 'Sem permissão para executar esta ação. Fale com o administrador.';
+    if (/jwt|token|expired/i.test(msg)) return 'Sessão expirada. Faça login novamente.';
+    return msg || 'Erro inesperado.';
+  }
+
   // 1. Verificação de Sessão
   const userData = JSON.parse(sessionStorage.getItem('biofirm_user') || 'null');
   if (!userData) {
     window.location.href = 'index.html';
     return;
   }
+
+  // Revalida sessão real do Supabase (sessionStorage é só cache de exibição e pode estar forjado/expirado)
+  supabaseClient.auth.getSession().then(function(res){
+    if (!res.data || !res.data.session) {
+      sessionStorage.removeItem('biofirm_user');
+      window.location.href = 'index.html';
+    }
+  });
 
   // Preenchimento de dados do usuário logado
   const userRoleEl = document.getElementById('userRole');
@@ -45,6 +72,18 @@ document.addEventListener('DOMContentLoaded', function() {
   if (userRoleEl) userRoleEl.textContent = userData.role ? userData.role.charAt(0).toUpperCase() + userData.role.slice(1) : 'Gestor';
   if (userNameEl) userNameEl.textContent = userData.username || 'Usuário';
   if (userAccessTagEl) userAccessTagEl.textContent = userData.role === 'gestor' ? 'Acesso Master' : 'Acesso ' + userData.role;
+
+  // RBAC (UI) — o enforcement real está nas policies RLS do banco (ver supabase/migrations/0001_init.sql)
+  const userRole = (userData.role || 'user').toLowerCase();
+  const canWrite = ['admin', 'gestor', 'manager'].indexOf(userRole) !== -1; // criar/editar funcionários
+  const canDelete = ['admin', 'gestor'].indexOf(userRole) !== -1;           // excluir funcionários
+  const canManageCargos = canDelete;                                        // cargos/salários: admin e gestor
+  if (!canWrite) {
+    const b = document.getElementById('btnOpenModal'); if (b) b.style.display = 'none';
+  }
+  if (!canManageCargos) {
+    const n = document.getElementById('navCargos'); if (n) n.style.display = 'none';
+  }
 
   // Logout
   const logoutBtn = document.getElementById('logoutBtn');
@@ -152,23 +191,23 @@ document.addEventListener('DOMContentLoaded', function() {
   function renderCargoSelect(){
     if(!empCargoInput) return;
     const cur = empCargoInput.value;
-    empCargoInput.innerHTML = '<option value="">Selecione o cargo</option>' + positions.map(p=> `<option value="${p.id}">${p.nome}${p.setor? ' · '+p.setor:''} — ${formatMoneyBRL(p.salario_base)}</option>`).join('');
+    empCargoInput.innerHTML = '<option value="">Selecione o cargo</option>' + positions.map(p=> `<option value="${p.id}">${escapeHtml(p.nome)}${p.setor? ' · '+escapeHtml(p.setor):''} — ${formatMoneyBRL(p.salario_base)}</option>`).join('');
     if(cur) empCargoInput.value = cur;
   }
   function renderCargoList(){
     const wrap = document.getElementById('cargoList');
     if(!wrap) return;
-    if(positions.length===0){ wrap.innerHTML='<p style="padding:12px; color:var(--color-text-muted); font-size:13px;">Nenhum cargo cadastrado. Crie o primeiro acima.</p>'; return; }
+    if(positions.length===0){ wrap.innerHTML='<p class="cargo-list-empty">Nenhum cargo cadastrado. Crie o primeiro acima.</p>'; return; }
     wrap.innerHTML = positions.map(p=> `
-      <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid var(--color-gold-light);">
+      <div class="cargo-row">
         <div>
-          <div style="font-weight:600; font-size:13px;">${p.nome}</div>
-          <div style="font-size:11px; color:var(--color-text-muted);">${p.setor||'Sem setor'} · ${formatMoneyBRL(p.salario_base)}</div>
+          <div class="cargo-row-name">${escapeHtml(p.nome)}</div>
+          <div class="cargo-row-meta">${escapeHtml(p.setor||'Sem setor')} · ${formatMoneyBRL(p.salario_base)}</div>
         </div>
-        <div style="display:flex; gap:6px;">
-          <button class="btn-secondary btn-small" data-cargo-edit="${p.id}">Editar</button>
-          <button class="action-btn action-btn-danger" data-cargo-del="${p.id}">Excluir</button>
-        </div>
+        ${canManageCargos ? `<div class="cargo-row-actions">
+          <button class="btn-secondary btn-small" data-cargo-edit="${p.id}" aria-label="Editar cargo ${escapeHtml(p.nome)}">Editar</button>
+          <button class="action-btn action-btn-danger" data-cargo-del="${p.id}" aria-label="Excluir cargo ${escapeHtml(p.nome)}">Excluir</button>
+        </div>` : ''}
       </div>
     `).join('');
     wrap.querySelectorAll('[data-cargo-edit]').forEach(btn=> btn.addEventListener('click', ()=> {
@@ -209,7 +248,7 @@ document.addEventListener('DOMContentLoaded', function() {
   function renderDiversosList(){
     if(!docDiversosList) return;
     const all = [...employeeDiversos.map(d=> ({...d, _saved:true})), ...pendingDiversos.map((d,i)=> ({...d, _pendingIndex:i, _saved:false}))];
-    if(all.length===0){ docDiversosList.innerHTML='<li style="font-size:12px; color:var(--color-text-muted); padding:6px;">Nenhum arquivo diverso adicionado.</li>'; return; }
+    if(all.length===0){ docDiversosList.innerHTML='<li class="list-empty">Nenhum arquivo diverso adicionado.</li>'; return; }
     const labelTipo = { certificado:'Certificado', doc_filho:'Doc. filho', outro:'Outro' };
     docDiversosList.innerHTML = all.map((d,idx)=>{
       const isSaved = d._saved;
@@ -217,12 +256,12 @@ document.addEventListener('DOMContentLoaded', function() {
       const tipo = isSaved ? d.tipo : d.tipo;
       const url = isSaved ? d.url : '#';
       const meta = isSaved ? (d.mime||'') + (d.tamanho_bytes? ' · '+ (d.tamanho_bytes/1024).toFixed(1)+'KB':'') : ((d.file? d.file.name : '') + (d.file? ' · '+(d.file.size/1024).toFixed(1)+'KB':''));
-      return `<li style="display:flex; align-items:center; justify-content:space-between; padding:8px; border:1px solid var(--color-gold-light); background:#FFFDF9;">
-        <div style="min-width:0; flex:1;">
-          <div style="font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><span style="background:var(--color-gold-light); padding:2px 6px; font-size:10px; margin-right:6px;">${labelTipo[tipo]||tipo}</span>${title}</div>
-          <div style="font-size:11px; color:var(--color-text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${isSaved? `<a href="${url}" target="_blank" style="color:var(--color-info); text-decoration:underline;">abrir</a> · `:''}${meta} ${isSaved? '': '· pendente (será enviado ao salvar)'}</div>
+      return `<li class="doc-item">
+        <div class="doc-item-body">
+          <div class="doc-item-title"><span class="doc-item-tag">${escapeHtml(labelTipo[tipo]||tipo)}</span>${escapeHtml(title)}</div>
+          <div class="doc-item-meta">${isSaved? `<a href="#" data-doc-ref="${escapeHtml(url)}" class="doc-link">abrir</a> · `:''}${escapeHtml(meta)} ${isSaved? '': '· pendente (será enviado ao salvar)'}</div>
         </div>
-        <button type="button" class="action-btn ${isSaved?'action-btn-danger':''}" data-div-del="${isSaved? d.id : 'pending:'+d._pendingIndex}" style="margin-left:8px;">${isSaved?'Remover':'×'}</button>
+        <button type="button" class="action-btn doc-item-remove ${isSaved?'action-btn-danger':''}" data-div-del="${isSaved? d.id : 'pending:'+d._pendingIndex}" aria-label="${isSaved? 'Remover arquivo' : 'Remover da fila'} ${escapeHtml(title)}">${isSaved?'Remover':'×'}</button>
       </li>`;
     }).join('');
     docDiversosList.querySelectorAll('[data-div-del]').forEach(btn=>{
@@ -234,8 +273,17 @@ document.addEventListener('DOMContentLoaded', function() {
           renderDiversosList();
         } else {
           if(!confirm('Remover este arquivo diverso?')) return;
+          const docAlvo = employeeDiversos.find(function(doc){ return String(doc.id) === String(v); });
           const { error } = await supabaseClient.from('employee_documents').delete().eq('id', v);
-          if(error) alert('Erro: '+error.message); else await fetchDiversos(employeeDiversos[0]? employeeDiversos[0].employee_id : null);
+          if(error) alert('Erro: '+friendlyError(error));
+          else {
+            // remove também o arquivo do Storage (melhor esforço)
+            if(docAlvo && docAlvo.url){
+              const p = extractStoragePath(docAlvo.url);
+              if(p) supabaseClient.storage.from(BUCKET).remove([p]).then(function(){});
+            }
+            await fetchDiversos(employeeDiversos[0]? employeeDiversos[0].employee_id : null);
+          }
         }
       });
     });
@@ -257,7 +305,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <tr>
           <td colspan="6" class="empty-state">
             <p class="empty-state-title">Erro ao carregar colaboradores</p>
-            <p style="font-size: 13px;">${err.message || 'Verifique a conexão com o servidor.'}</p>
+            <p class="empty-state-text">${escapeHtml(friendlyError(err))}</p>
           </td>
         </tr>
       `;
@@ -317,7 +365,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <tr>
           <td colspan="6" class="empty-state">
             <p class="empty-state-title">Nenhum colaborador encontrado</p>
-            <p style="font-size: 13px;">Clique em "+ Novo Funcionário" para realizar o primeiro cadastro.</p>
+            <p class="empty-state-text">Clique em "+ Novo Funcionário" para realizar o primeiro cadastro.</p>
           </td>
         </tr>
       `;
@@ -326,7 +374,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     list.forEach(emp => {
       const tr = document.createElement('tr');
-      tr.style.cursor = 'pointer';
 
       // Tratamento de classes de status
       let statusClass = 'status-sem-dados';
@@ -340,27 +387,28 @@ document.addEventListener('DOMContentLoaded', function() {
       if (vinculo === 'Inativo') vinculoClass = 'vinculo-inativo';
       else if (vinculo === 'Demitido') vinculoClass = 'vinculo-demitido';
 
-      const fotoThumb = emp.foto_url ? `<img src="${emp.foto_url}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--color-gold-light);margin-right:8px;vertical-align:middle;">` : '';
+      const fotoThumb = emp.foto_url ? `<img data-photo-ref="${escapeHtml(emp.foto_url)}" src="${PHOTO_PLACEHOLDER}" alt="" class="table-thumb">` : '';
+      const safeName = escapeHtml(emp.name || 'colaborador');
+      const actionButtons =
+        `<button class="action-btn" data-action="view" data-id="${emp.id}" title="Ver Ficha" aria-label="Ver ficha de ${safeName}">Ver</button>` +
+        (canWrite ? `<button class="action-btn" data-action="edit" data-id="${emp.id}" title="Editar Dados" aria-label="Editar dados de ${safeName}">Editar</button>` : '') +
+        (canDelete ? `<button class="action-btn action-btn-danger" data-action="delete" data-id="${emp.id}" title="Excluir" aria-label="Excluir ${safeName}">Excluir</button>` : '');
       tr.innerHTML = `
         <td>
-          <div class="employee-name" style="display:flex;align-items:center;">${fotoThumb}${emp.name}</div>
+          <div class="employee-name">${fotoThumb}${escapeHtml(emp.name)}</div>
         </td>
-        <td class="mono">${formatCPF(emp.cpf)}</td>
+        <td class="mono">${escapeHtml(formatCPF(emp.cpf))}</td>
         <td>
-          <div style="font-weight: 500;">${emp.cargo || '-'}</div>
-          <div class="employee-role-dept">${emp.setor || '-'}${emp.salario!=null? ' · '+formatMoneyBRL(emp.salario):''}</div>
-        </td>
-        <td>
-          <span class="status-badge ${statusClass}">${emp.status || 'Sem dados'}</span>
+          <div class="cell-strong">${escapeHtml(emp.cargo || '-')}</div>
+          <div class="employee-role-dept">${escapeHtml(emp.setor || '-')}${emp.salario!=null? ' · '+formatMoneyBRL(emp.salario):''}</div>
         </td>
         <td>
-          <span class="vinculo-badge ${vinculoClass}">${vinculo}</span>
+          <span class="status-badge ${statusClass}">${escapeHtml(emp.status || 'Sem dados')}</span>
         </td>
-        <td class="actions">
-          <button class="action-btn" data-action="view" data-id="${emp.id}" title="Ver Ficha">Ver</button>
-          <button class="action-btn" data-action="edit" data-id="${emp.id}" title="Editar Dados">Editar</button>
-          <button class="action-btn action-btn-danger" data-action="delete" data-id="${emp.id}" title="Excluir">Excluir</button>
+        <td>
+          <span class="vinculo-badge ${vinculoClass}">${escapeHtml(vinculo)}</span>
         </td>
+        <td class="actions">${actionButtons}</td>
       `;
 
       // Botões Ver/Editar/Excluir — listener direto (garante funcionamento mesmo com stopPropagation)
@@ -373,16 +421,7 @@ document.addEventListener('DOMContentLoaded', function() {
           if(!empItem) return;
           if(action==='view') window.viewEmployeeDetail(id);
           else if(action==='edit') openEditModal(empItem);
-          else if(action==='delete'){
-            if(confirm(`Deseja realmente excluir o cadastro de ${empItem.name}?`)){
-              try{
-                const { error } = await supabaseClient.from('employees').delete().eq('id', id);
-                if(error) throw error;
-                if(selectedEmployeeId == id) selectedEmployeeId=null;
-                await fetchEmployees();
-              }catch(err){ alert('Erro ao excluir: '+err.message); }
-            }
-          }
+          else if(action==='delete') deleteEmployee(empItem);
         });
       });
       // Clique na linha seleciona o colaborador no painel lateral
@@ -402,6 +441,9 @@ document.addEventListener('DOMContentLoaded', function() {
       tbody.appendChild(tr);
     });
 
+    // Resolve URLs assinadas das fotos (bucket privado)
+    hydratePhotos(tbody);
+
     // Se houver itens e nenhum estiver selecionado, seleciona o primeiro
     if (list.length > 0 && (!selectedEmployeeId || !employees.find(e => e.id == selectedEmployeeId))) {
       selectedEmployeeId = list[0].id;
@@ -416,7 +458,7 @@ document.addEventListener('DOMContentLoaded', function() {
   function renderSidebarDetail() {
     if (!selectedEmployeeId) {
       detailContent.innerHTML = `
-        <p class="empty-state-text" style="font-size: 13px; color: var(--color-text-muted); text-align: center;">
+        <p class="detail-empty-text">
           Selecione um funcionário na tabela para visualizar a ficha rápida.
         </p>
       `;
@@ -433,57 +475,62 @@ document.addEventListener('DOMContentLoaded', function() {
     if (vinculo === 'Inativo') vinculoClass = 'vinculo-inativo';
     else if (vinculo === 'Demitido') vinculoClass = 'vinculo-demitido';
 
-    const fotoHtml = emp.foto_url ? `<img src="${emp.foto_url}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:1px solid var(--color-gold);">` : `<div class="detail-avatar">${initial}</div>`;
+    const fotoHtml = emp.foto_url ? `<img data-photo-ref="${escapeHtml(emp.foto_url)}" src="${PHOTO_PLACEHOLDER}" alt="" class="detail-side-photo">` : `<div class="detail-avatar">${escapeHtml(initial)}</div>`;
     const docsCount = [emp.rg_frente_url, emp.rg_verso_url, emp.cpf_doc_url, emp.comprovante_endereco_url, emp.ctps_doc_url].filter(Boolean).length;
     const salarioTxt = emp.salario!=null ? formatMoneyBRL(emp.salario) : (emp.cargo_id && positions.find(p=> String(p.id)===String(emp.cargo_id)) ? formatMoneyBRL(positions.find(p=> String(p.id)===String(emp.cargo_id)).salario_base) : '-');
     detailContent.innerHTML = `
       <div class="detail-header">
         ${fotoHtml}
         <div>
-          <div class="detail-title">${emp.name}</div>
-          <div class="detail-subtitle">${emp.cargo || 'Cargo não informado'} · <span style="color:var(--color-success); font-weight:600;">${salarioTxt}</span></div>
-          <div style="font-size:11px; color:var(--color-text-muted);">${docsCount}/5 docs · CTPS: ${emp.ctps_numero||'-'} · PIS: ${emp.pis_pasep? (window.BiofirmMasks? window.BiofirmMasks.MASKS.pis(emp.pis_pasep): emp.pis_pasep) : '-'}</div>
+          <div class="detail-title">${escapeHtml(emp.name)}</div>
+          <div class="detail-subtitle">${escapeHtml(emp.cargo || 'Cargo não informado')} · <span class="text-success-strong">${salarioTxt}</span></div>
+          <div class="detail-meta">${docsCount}/5 docs · CTPS: ${escapeHtml(emp.ctps_numero||'-')} · PIS: ${emp.pis_pasep? escapeHtml(window.BiofirmMasks? window.BiofirmMasks.MASKS.pis(emp.pis_pasep): emp.pis_pasep) : '-'}</div>
         </div>
       </div>
       <div class="detail-list">
         <div class="detail-row">
           <span class="detail-row-label">CPF:</span>
-          <span class="detail-row-value mono">${formatCPF(emp.cpf)}</span>
+          <span class="detail-row-value mono">${escapeHtml(formatCPF(emp.cpf))}</span>
         </div>
         <div class="detail-row">
           <span class="detail-row-label">RG:</span>
-          <span class="detail-row-value mono">${formatRG(emp.rg) || '-'}</span>
+          <span class="detail-row-value mono">${escapeHtml(formatRG(emp.rg) || '-')}</span>
         </div>
         <div class="detail-row">
           <span class="detail-row-label">Setor:</span>
-          <span class="detail-row-value">${emp.setor || '-'}</span>
+          <span class="detail-row-value">${escapeHtml(emp.setor || '-')}</span>
         </div>
         <div class="detail-row">
           <span class="detail-row-label">Endereço:</span>
-          <span class="detail-row-value">${formatAddress(emp) || '-'}</span>
+          <span class="detail-row-value">${escapeHtml(formatAddress(emp) || '-')}</span>
         </div>
         <div class="detail-row">
           <span class="detail-row-label">Documentos:</span>
-          <span class="detail-row-value" style="font-size:11px;">${docsCount===5?'✅ Completo': docsCount+'/5'} ${emp.rg_frente_url?'· RG frente':''} ${emp.rg_verso_url?'· verso':''}</span>
+          <span class="detail-row-value detail-doc-count">${docsCount===5?'✅ Completo': docsCount+'/5'} ${emp.rg_frente_url?'· RG frente':''} ${emp.rg_verso_url?'· verso':''}</span>
         </div>
         <div class="detail-row">
           <span class="detail-row-label">Vínculo:</span>
-          <span class="vinculo-badge ${vinculoClass}">${vinculo}</span>
+          <span class="vinculo-badge ${vinculoClass}">${escapeHtml(vinculo)}</span>
         </div>
         <div class="detail-row">
           <span class="detail-row-label">Status Fluxo:</span>
-          <span class="detail-row-value">${emp.status || 'Sem dados'}</span>
+          <span class="detail-row-value">${escapeHtml(emp.status || 'Sem dados')}</span>
         </div>
         <div class="detail-row">
           <span class="detail-row-label">Data de Registro:</span>
           <span class="detail-row-value mono">${emp.created_at ? new Date(emp.created_at).toLocaleDateString('pt-BR') : '-'}</span>
         </div>
       </div>
-      <div style="display: flex; gap: 8px; margin-top: 6px;">
-        <button class="btn-secondary btn-small" style="flex: 1;" onclick="window.viewEmployeeDetail(${emp.id})">Visualizar Ficha</button>
-        <button class="btn-primary btn-small" style="flex: 1;" onclick="window.editEmployeeModal(${emp.id})">Editar</button>
+      <div class="sidebar-actions">
+        <button class="btn-secondary btn-small flex-1" data-detail-view>Visualizar Ficha</button>
+        ${canWrite ? '<button class="btn-primary btn-small flex-1" data-detail-edit>Editar</button>' : ''}
       </div>
     `;
+    const btnDetailView = detailContent.querySelector('[data-detail-view]');
+    if (btnDetailView) btnDetailView.addEventListener('click', function(){ window.viewEmployeeDetail(emp.id); });
+    const btnDetailEdit = detailContent.querySelector('[data-detail-edit]');
+    if (btnDetailEdit) btnDetailEdit.addEventListener('click', function(){ openEditModal(emp); });
+    hydratePhotos(detailContent);
     detailContent.dataset.lastId = String(emp.id);
     if (isSwitching && window.BiofirmAnimations) window.BiofirmAnimations.animateDetailSwitch();
     else if (!isSwitching && window.BiofirmAnimations && !detailContent.dataset.animatedOnce) {
@@ -493,12 +540,17 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // 7. Eventos de Busca e Filtros
-  searchInput.addEventListener('input', render);
+  let searchDebounce = null;
+  searchInput.addEventListener('input', function(){
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(render, 200);
+  });
   filterStatus.addEventListener('change', render);
   filterVinculo.addEventListener('change', render);
 
   // 8. Modais e Formulário — com GSAP
   function openCreateModal() {
+    if (!canWrite) { alert('Seu perfil permite apenas visualização.'); return; }
     modalFormTitle.textContent = 'Novo Colaborador';
     empIdInput.value = '';
     employeeForm.reset();
@@ -519,6 +571,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function openEditModal(emp) {
+    if (!canWrite) { alert('Seu perfil permite apenas visualização.'); return; }
     modalFormTitle.textContent = 'Editar Colaborador';
     empIdInput.value = emp.id;
     empNameInput.value = emp.name || '';
@@ -551,8 +604,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Foto e docs existentes
     if (empFotoUrlInput) empFotoUrlInput.value = emp.foto_url || '';
     if (fotoPreviewWrap) {
-      fotoPreviewWrap.style.backgroundImage = emp.foto_url ? `url(${emp.foto_url})` : '';
+      fotoPreviewWrap.style.backgroundImage = '';
       fotoPreviewWrap.style.backgroundSize = 'cover';
+      if (emp.foto_url) {
+        resolveDocUrl(emp.foto_url).then(function(u){
+          if (u) fotoPreviewWrap.style.backgroundImage = 'url("' + u + '")';
+        });
+      }
     }
     if (empRgFrenteUrlInput) empRgFrenteUrlInput.value = emp.rg_frente_url || '';
     if (empRgVersoUrlInput) empRgVersoUrlInput.value = emp.rg_verso_url || '';
@@ -590,7 +648,7 @@ document.addEventListener('DOMContentLoaded', function() {
   function renderDocLink(infoId, url){
     const el=document.getElementById(infoId);
     if(!el) return;
-    if(url) el.innerHTML = `<a href="${url}" target="_blank" style="color:var(--color-info);">Arquivo atual — abrir</a>`;
+    if(url) el.innerHTML = `<a href="#" data-doc-ref="${escapeHtml(url)}" class="doc-link">Arquivo atual — abrir</a>`;
     else el.textContent='';
   }
 
@@ -687,9 +745,8 @@ document.addEventListener('DOMContentLoaded', function() {
       const err = document.createElement('span');
       err.className = 'field-error';
       err.textContent = msg;
-      err.style.cssText = 'color: var(--color-danger); font-size: 11px; display: block; margin-top: 2px;';
       input.parentNode.appendChild(err);
-      input.style.borderColor = 'var(--color-danger)';
+      input.classList.add('field-invalid');
       if (window.BiofirmAnimations && !window.BiofirmAnimations.prefersReducedMotion() && typeof gsap !== 'undefined') {
         gsap.killTweensOf(input);
         gsap.timeline().to(input, { x: -5, duration: 0.06 }).to(input, { x: 5, duration: 0.06 }).to(input, { x: -3, duration: 0.06 }).to(input, { x: 0, duration: 0.08 });
@@ -701,7 +758,7 @@ document.addEventListener('DOMContentLoaded', function() {
      if (!input) return;
      const err = input.parentNode.querySelector('.field-error');
      if (err) err.remove();
-     input.style.borderColor = '';
+     input.classList.remove('field-invalid');
    }
 
    async function searchCEP() {
@@ -763,7 +820,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const btnCloseCargoModal = document.getElementById('btnCloseCargoModal');
   const btnCloseCargoBtn = document.getElementById('btnCloseCargoBtn');
   const btnSaveCargo = document.getElementById('btnSaveCargo');
-  function openCargoModal(){ if(window.BiofirmAnimations) window.BiofirmAnimations.openModalAnimated(cargoModal); else cargoModal.classList.add('active'); renderCargoList(); }
+  function openCargoModal(){ if(!canManageCargos){ alert('Seu perfil não permite gerenciar cargos.'); return; } if(window.BiofirmAnimations) window.BiofirmAnimations.openModalAnimated(cargoModal); else cargoModal.classList.add('active'); renderCargoList(); }
   function closeCargoModal(){ if(window.BiofirmAnimations) window.BiofirmAnimations.closeModalAnimated(cargoModal); else cargoModal.classList.remove('active'); const n=document.getElementById('cargoNome'); if(n) n.value=''; const s=document.getElementById('cargoSetor'); if(s) s.value=''; const sal=document.getElementById('cargoSalario'); if(sal){ sal.value=''; delete sal.dataset.editId; } }
   if(btnManageCargos) btnManageCargos.addEventListener('click', openCargoModal);
   if(navCargos) navCargos.addEventListener('click', function(e){ e.preventDefault(); openCargoModal(); });
@@ -771,6 +828,7 @@ document.addEventListener('DOMContentLoaded', function() {
   if(btnCloseCargoBtn) btnCloseCargoBtn.addEventListener('click', closeCargoModal);
   if(cargoModal) cargoModal.addEventListener('click', function(e){ if(e.target===cargoModal) closeCargoModal(); });
   if(btnSaveCargo) btnSaveCargo.addEventListener('click', async function(){
+    if(!canManageCargos){ alert('Seu perfil não permite gerenciar cargos.'); return; }
     const nomeEl=document.getElementById('cargoNome');
     const setorEl=document.getElementById('cargoSetor');
     const salEl=document.getElementById('cargoSalario');
@@ -854,21 +912,70 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Upload helpers com compressão (economia 1GB)
   const BUCKET = 'employee-docs';
-  async function ensureBucket(){ /* bucket criado via SQL, ignora erro */ }
+  const ALLOWED_FILE_TYPES = { 'image/jpeg': ['jpg','jpeg'], 'image/png': ['png'], 'image/webp': ['webp'], 'application/pdf': ['pdf'] };
+  const PHOTO_PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
+  // Extrai a chave do objeto a partir de URL pública legada; retorna a própria string se já for chave
+  function extractStoragePath(stored){
+    if(!stored) return '';
+    const s = String(stored);
+    const marker = '/object/public/' + BUCKET + '/';
+    const i = s.indexOf(marker);
+    if(i >= 0) return s.slice(i + marker.length);
+    if(/^https?:\/\//i.test(s)) return ''; // URL externa desconhecida — não pertence ao bucket
+    return s;
+  }
+
+  // Resolve URL assinada (1h) com cache; fallback para URL pública (bucket ainda público / dado legado)
+  const signedUrlCache = {};
+  async function resolveDocUrl(stored){
+    if(!stored) return '';
+    const path = extractStoragePath(stored);
+    if(!path) return String(stored); // URL externa — usa como está
+    const hit = signedUrlCache[path];
+    if(hit && hit.exp > Date.now() + 60000) return hit.url;
+    try{
+      const { data, error } = await supabaseClient.storage.from(BUCKET).createSignedUrl(path, 3600);
+      if(error) throw error;
+      signedUrlCache[path] = { url: data.signedUrl, exp: Date.now() + 3500 * 1000 };
+      return data.signedUrl;
+    }catch(e){
+      // bucket ainda público ou objeto inexistente — tenta URL pública como fallback
+      return supabaseClient.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+    }
+  }
+
+  // Hidrata elementos [data-photo-ref] (img ou background) com URL assinada
+  function hydratePhotos(root){
+    if(!root || !root.querySelectorAll) return;
+    root.querySelectorAll('[data-photo-ref]').forEach(function(el){
+      resolveDocUrl(el.getAttribute('data-photo-ref')).then(function(u){
+        if(!u) return;
+        if(el.tagName === 'IMG') el.src = u;
+        else el.style.backgroundImage = 'url("' + u + '")';
+      });
+    });
+  }
+
+  async function ensureBucket(){ /* bucket criado/configurado via SQL (supabase/migrations), ignora */ }
   async function uploadFile(file, folder, empIdHint){
     if(!file) return null;
+    // Allowlist de tipos (MIME + extensão) — reforçada no bucket via allowed_mime_types
+    const origExt = (file.name.split('.').pop() || '').toLowerCase();
+    if(!ALLOWED_FILE_TYPES[file.type] || ALLOWED_FILE_TYPES[file.type].indexOf(origExt) === -1){
+      throw new Error('Tipo de arquivo não permitido: ' + file.name + '. Use JPG, PNG, WebP ou PDF.');
+    }
     let toUpload = file;
     if(window.BiofirmCompress && file.type.startsWith('image/')){
       try { toUpload = await window.BiofirmCompress.compressImage(file, { maxWidth: 1280, quality: 0.72 }); } catch(e){ toUpload=file; }
     }
     if(toUpload.size > 10*1024*1024){ throw new Error('Arquivo excede 10MB: '+file.name); }
-    const ext = toUpload.name.split('.').pop() || 'bin';
+    const ext = (toUpload.name.split('.').pop() || 'bin').toLowerCase();
     const safeFolder = folder.replace(/[^a-z0-9_-]/gi,'');
     const key = `${safeFolder}/${empIdHint||'tmp'}_${Date.now()}_${Math.random().toString(36).slice(2,6)}.${ext}`;
     const { error } = await supabaseClient.storage.from(BUCKET).upload(key, toUpload, { cacheControl:'3600', upsert:false, contentType: toUpload.type });
     if(error) throw error;
-    const { data } = supabaseClient.storage.from(BUCKET).getPublicUrl(key);
-    return data.publicUrl;
+    return key; // armazenamos a CHAVE (não a URL pública) — resolvida via URL assinada na exibição
   }
   function bindDocInput(fileInput, urlInput, infoId, previewId){
     if(!fileInput) return;
@@ -1011,6 +1118,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Salvar Colaborador (POST ou PUT) — cadastro completo com uploads comprimidos
   employeeForm.addEventListener('submit', async function(e) {
     e.preventDefault();
+    if(!canWrite){ alert('Seu perfil permite apenas visualização.'); return; }
 
     const id = empIdInput.value;
     // Uploads pendentes (se houver file selecionado, comprime e envia para Storage)
@@ -1018,12 +1126,35 @@ document.addEventListener('DOMContentLoaded', function() {
     const origBtnText = btnSave ? btnSave.textContent : '';
     if(btnSave){ btnSave.disabled=true; btnSave.textContent='Salvando...'; }
     try {
+      // 1) Validação ANTES de qualquer upload (evita arquivos órfãos no Storage)
+      clearAllErrors();
+      let hasError = false;
+      const cargoIdVal = empCargoInput && empCargoInput.value ? Number(empCargoInput.value) : null;
+      const nameVal = empNameInput.value.trim();
+      const cpfVal = empCpfInput.value.trim();
+      const rgVal = empRgInput ? empRgInput.value.trim() : '';
+
+      if (!nameVal) { showFieldError(empNameInput, 'Nome completo é obrigatório.'); hasError = true; }
+      if (!cpfVal || !validateCPF(cpfVal)) { showFieldError(empCpfInput, 'CPF inválido.'); hasError = true; }
+      if (!cargoIdVal) { showFieldError(empCargoInput, 'Selecione o cargo/função.'); hasError = true; }
+      if (rgVal && !validateRG(rgVal)) { showFieldError(empRgInput, 'RG inválido.'); hasError = true; }
+
+      // CPF duplicado — checagem local; a constraint unique do banco é o fallback
+      const cpfDigits = cpfVal.replace(/\D+/g, '');
+      if (cpfDigits.length === 11) {
+        const dupCpf = employees.find(function(emp){ return String(emp.id) !== String(id) && (emp.cpf || '').replace(/\D+/g, '') === cpfDigits; });
+        if (dupCpf) { showFieldError(empCpfInput, 'CPF já cadastrado para ' + (dupCpf.name || 'outro colaborador') + '.'); hasError = true; }
+      }
+      if (hasError) { if(btnSave){ btnSave.disabled=false; btnSave.textContent=origBtnText; } return; }
+
+      // 2) Uploads (somente após validação) — chaves rastreadas para rollback em caso de falha no banco
       const hint = id || 'new_'+Date.now();
+      const uploadedKeys = [];
       // foto
       if(empFotoInput && empFotoInput.files[0]){
         const f = empFotoInput._compressedFile || empFotoInput.files[0];
-        const url = await uploadFile(f, 'foto', hint);
-        if(url && empFotoUrlInput) empFotoUrlInput.value = url;
+        const key = await uploadFile(f, 'foto', hint);
+        if(key){ uploadedKeys.push(key); if(empFotoUrlInput) empFotoUrlInput.value = key; }
       }
       const uploads = [
         [empRgFrenteInput, empRgFrenteUrlInput, 'rg_frente'],
@@ -1035,12 +1166,11 @@ document.addEventListener('DOMContentLoaded', function() {
       for(const [fin, urlIn, folder] of uploads){
         if(fin && fin.files[0]){
           const f = fin._compressedFile || fin.files[0];
-          const url = await uploadFile(f, folder, hint);
-          if(url && urlIn) urlIn.value = url;
+          const key = await uploadFile(f, folder, hint);
+          if(key){ uploadedKeys.push(key); if(urlIn) urlIn.value = key; }
         }
       }
 
-      const cargoIdVal = empCargoInput && empCargoInput.value ? Number(empCargoInput.value) : null;
       const payload = {
         name: empNameInput.value.trim(),
         cpf: empCpfInput.value.trim(),
@@ -1076,96 +1206,82 @@ document.addEventListener('DOMContentLoaded', function() {
       // Normaliza vazios para null (evita string vazia no banco)
       Object.keys(payload).forEach(k=>{ if(payload[k]==='') payload[k]=null; });
 
-      clearAllErrors();
-      let hasError = false;
-
-      if (!payload.name) {
-        showFieldError(empNameInput, 'Nome completo é obrigatório.');
-        hasError = true;
-      }
-      if (!payload.cpf || !validateCPF(payload.cpf)) {
-        showFieldError(empCpfInput, 'CPF inválido.');
-        hasError = true;
-      }
-      if (!payload.cargo_id) {
-        showFieldError(empCargoInput, 'Selecione o cargo/função.');
-        hasError = true;
-      }
-      if (payload.rg && !validateRG(payload.rg)) {
-        showFieldError(empRgInput, 'RG inválido.');
-        hasError = true;
-      }
-      if (hasError) { if(btnSave){ btnSave.disabled=false; btnSave.textContent=origBtnText; } return; }
-
+      // 3) Persistência — com rollback dos arquivos enviados em caso de falha no banco
       let savedId = id ? Number(id) : null;
-      if (id) {
-        const { error } = await supabaseClient
-          .from('employees')
-          .update(payload)
-          .eq('id', id);
-        if (error) throw error;
-        savedId = Number(id);
-      } else {
-        const { data, error } = await supabaseClient
-          .from('employees')
-          .insert(payload)
-          .select('id')
-          .single();
-        if (error) throw error;
-        savedId = data ? data.id : null;
+      try {
+        if (id) {
+          const { error } = await supabaseClient
+            .from('employees')
+            .update(payload)
+            .eq('id', id);
+          if (error) throw error;
+          savedId = Number(id);
+        } else {
+          const { data, error } = await supabaseClient
+            .from('employees')
+            .insert(payload)
+            .select('id')
+            .single();
+          if (error) throw error;
+          savedId = data ? data.id : null;
+        }
+      } catch (saveErr) {
+        if (uploadedKeys.length) {
+          try { await supabaseClient.storage.from(BUCKET).remove(uploadedKeys); } catch (_) { /* melhor esforço */ }
+        }
+        throw saveErr;
       }
-      // envia arquivos diversos pendentes (modo criação)
+      // 4) Envia arquivos diversos pendentes (modo criação) — falhas são informadas ao usuário
+      let diversosFalhas = 0;
       if(pendingDiversos.length>0 && savedId){
         for(const pd of pendingDiversos){
           try{
-            const url = await uploadFile(pd.file, 'diversos', String(savedId));
-            const { error } = await supabaseClient.from('employee_documents').insert({ employee_id: savedId, tipo: pd.tipo, titulo: pd.titulo, url, mime: pd.file.type, tamanho_bytes: pd.file.size });
-            if(error) console.error('diversos insert', error);
-          }catch(e){ console.error('diversos upload', e); }
+            const key = await uploadFile(pd.file, 'diversos', String(savedId));
+            const { error } = await supabaseClient.from('employee_documents').insert({ employee_id: savedId, tipo: pd.tipo, titulo: pd.titulo, url: key, mime: pd.file.type, tamanho_bytes: pd.file.size });
+            if(error){ console.error('diversos insert', error); diversosFalhas++; }
+          }catch(e){ console.error('diversos upload', e); diversosFalhas++; }
         }
         pendingDiversos = [];
+        if(diversosFalhas>0) alert('Cadastro salvo, mas ' + diversosFalhas + ' arquivo(s) diverso(s) falharam no envio. Reenvie pela edição do cadastro.');
       }
 
       closeModal();
       await fetchEmployees();
       if (savedId) selectedEmployeeId = String(savedId);
     } catch (err) {
-      alert('Erro: ' + err.message);
+      alert('Erro: ' + friendlyError(err));
     } finally {
       if(btnSave){ btnSave.disabled=false; btnSave.textContent=origBtnText; }
     }
   });
 
-  // 9. Delegar Ações da Tabela
-  tbody.addEventListener('click', async function(e) {
-    const btn = e.target.closest('button[data-action]');
-    if (!btn) return;
-
-    const action = btn.dataset.action;
-    const id = btn.dataset.id;
-    const emp = employees.find(item => item.id == id);
-    if (!emp) return;
-
-    if (action === 'view') {
-      window.viewEmployeeDetail(id);
-    } else if (action === 'edit') {
-      openEditModal(emp);
-    } else if (action === 'delete') {
-      if (confirm(`Deseja realmente excluir o cadastro de ${emp.name}?`)) {
-        try {
-          const { error } = await supabaseClient
-            .from('employees')
-            .delete()
-            .eq('id', id);
-          if (error) throw error;
-          if (selectedEmployeeId == id) selectedEmployeeId = null;
-          await fetchEmployees();
-        } catch (err) {
-          alert('Erro ao excluir: ' + err.message);
-        }
+  // 9. Exclusão com limpeza completa (registro + documentos + arquivos no Storage — LGPD)
+  async function deleteEmployee(emp){
+    if(!canDelete){ alert('Seu perfil não permite excluir cadastros.'); return; }
+    if(!confirm('Excluir o cadastro de ' + emp.name + '?\n\nDocumentos e arquivos anexos serão removidos permanentemente.')) return;
+    try{
+      // busca docs diversos ANTES de excluir (FK pode ter cascade)
+      let docs = [];
+      try{
+        const res = await supabaseClient.from('employee_documents').select('url').eq('employee_id', emp.id);
+        docs = res.data || [];
+      }catch(_){}
+      const { error } = await supabaseClient.from('employees').delete().eq('id', emp.id);
+      if(error) throw error;
+      await supabaseClient.from('employee_documents').delete().eq('employee_id', emp.id);
+      // remove arquivos do Storage (melhor esforço — falha não bloqueia a exclusão)
+      const refs = [emp.foto_url, emp.rg_frente_url, emp.rg_verso_url, emp.cpf_doc_url, emp.comprovante_endereco_url, emp.ctps_doc_url]
+        .concat(docs.map(function(d){ return d.url; }))
+        .filter(Boolean);
+      const paths = refs.map(extractStoragePath).filter(Boolean);
+      if(paths.length){
+        const { error: stErr } = await supabaseClient.storage.from(BUCKET).remove(paths);
+        if(stErr) console.warn('Alguns arquivos podem ter permanecido no Storage:', stErr);
       }
-    }
-  });
+      if(selectedEmployeeId == emp.id) selectedEmployeeId = null;
+      await fetchEmployees();
+    }catch(err){ alert('Erro ao excluir: ' + friendlyError(err)); }
+  }
 
   let viewModalEmployeeId = null;
   // 10. Funções Globais de Visualização / Modal
@@ -1181,8 +1297,8 @@ document.addEventListener('DOMContentLoaded', function() {
     else if (vinculo === 'Demitido') vinculoClass = 'vinculo-demitido';
 
     const addressText = formatAddress(emp) || 'Endereço não cadastrado';
-    const fotoView = emp.foto_url ? `<img src="${emp.foto_url}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--color-gold);">` : `<div style="width:64px;height:64px;border-radius:50%;background:#F0E6CE;border:1px solid var(--color-gold);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-style:italic;">${emp.name?emp.name.charAt(0).toUpperCase():'B'}</div>`;
-    const docLink = (url,label) => url ? `<a href="${url}" target="_blank" style="color:var(--color-info);text-decoration:underline;">${label} — abrir</a>` : `<span style="color:var(--color-text-muted);">${label} — pendente</span>`;
+    const fotoView = emp.foto_url ? `<img data-photo-ref="${escapeHtml(emp.foto_url)}" src="${PHOTO_PLACEHOLDER}" alt="" class="ficha-avatar">` : `<div class="ficha-avatar-empty">${escapeHtml(emp.name?emp.name.charAt(0).toUpperCase():'B')}</div>`;
+    const docLink = (url,label) => url ? `<a href="#" data-doc-ref="${escapeHtml(url)}" class="doc-link">${label} — abrir</a>` : `<span class="doc-pending">${label} — pendente</span>`;
     const pos = emp.cargo_id ? positions.find(p=> String(p.id)===String(emp.cargo_id)) : null;
     const salarioView = emp.salario!=null ? formatMoneyBRL(emp.salario) : (pos? formatMoneyBRL(pos.salario_base) : '-');
     // busca docs diversos para exibir na ficha
@@ -1191,70 +1307,71 @@ document.addEventListener('DOMContentLoaded', function() {
       const { data } = await supabaseClient.from('employee_documents').select('*').eq('employee_id', emp.id).order('created_at');
       diversos = data || [];
     }catch(e){}
-    const diversosHtml = diversos.length ? diversos.map(d=> `<div style="font-size:11px; padding:4px 0; border-bottom:1px solid #F0E6CE;"><span style="background:var(--color-gold-light); padding:1px 5px; font-size:10px;">${d.tipo==='certificado'?'Certificado':d.tipo==='doc_filho'?'Doc. filho':'Outro'}</span> <a href="${d.url}" target="_blank" style="color:var(--color-info); text-decoration:underline;">${d.titulo}</a> <span style="color:var(--color-text-muted);">· ${d.mime||''}</span></div>`).join('') : '<span style="color:var(--color-text-muted); font-size:11px;">Nenhum arquivo diverso.</span>';
+    const diversosHtml = diversos.length ? diversos.map(d=> `<div class="ficha-doc-row"><span class="ficha-doc-tag">${d.tipo==='certificado'?'Certificado':d.tipo==='doc_filho'?'Doc. filho':'Outro'}</span> <a href="#" data-doc-ref="${escapeHtml(d.url)}" class="doc-link">${escapeHtml(d.titulo)}</a> <span class="doc-pending">· ${escapeHtml(d.mime||'')}</span></div>`).join('') : '<span class="ficha-doc-empty">Nenhum arquivo diverso.</span>';
     viewContent.innerHTML = `
-      <div style="background: #FFFDF9; border: 1px solid var(--color-gold-light); padding: 24px; margin-bottom: 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--color-gold-light); padding-bottom: 14px; margin-bottom: 16px; gap:12px;">
-          <div style="display:flex; gap:14px; align-items:center;">
+      <div class="ficha-card">
+        <div class="ficha-head">
+          <div class="ficha-head-main">
             ${fotoView}
             <div>
-              <h3 style="font-family: var(--font-display); font-size: 20px; font-style: italic; color: var(--color-text);">${emp.name}</h3>
-              <p style="font-size: 13px; color: var(--color-text-muted);">${emp.cargo || 'Cargo não especificado'} · ${emp.setor || 'Setor não especificado'} · <span style="color:var(--color-success); font-weight:600;">${salarioView}</span></p>
-              <p class="mono" style="font-size:11px; color:var(--color-text-muted);">CTPS: ${emp.ctps_numero || '-'} · PIS: ${emp.pis_pasep || '-'} · Salário fixo do cargo: ${salarioView}</p>
+              <h3 class="ficha-name">${escapeHtml(emp.name)}</h3>
+              <p class="ficha-sub">${escapeHtml(emp.cargo || 'Cargo não especificado')} · ${escapeHtml(emp.setor || 'Setor não especificado')} · <span class="text-success-strong">${salarioView}</span></p>
+              <p class="mono ficha-meta">CTPS: ${escapeHtml(emp.ctps_numero || '-')} · PIS: ${escapeHtml(emp.pis_pasep || '-')} · Salário fixo do cargo: ${salarioView}</p>
             </div>
           </div>
-          <span class="vinculo-badge ${vinculoClass}">${vinculo}</span>
+          <span class="vinculo-badge ${vinculoClass}">${escapeHtml(vinculo)}</span>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; font-size: 13px;">
+        <div class="ficha-grid">
           <div>
-            <span style="color: var(--color-text-muted); display: block; margin-bottom: 2px;">CPF:</span>
-            <strong class="mono" style="font-size: 14px;">${formatCPF(emp.cpf)}</strong>
+            <span class="ficha-label">CPF:</span>
+            <strong class="mono ficha-value">${escapeHtml(formatCPF(emp.cpf))}</strong>
           </div>
           <div>
-            <span style="color: var(--color-text-muted); display: block; margin-bottom: 2px;">RG:</span>
-            <strong class="mono" style="font-size: 14px;">${formatRG(emp.rg) || '-'}</strong>
+            <span class="ficha-label">RG:</span>
+            <strong class="mono ficha-value">${escapeHtml(formatRG(emp.rg) || '-')}</strong>
           </div>
-          <div style="grid-column: 1 / -1;">
-            <span style="color: var(--color-text-muted); display: block; margin-bottom: 2px;">Endereço:</span>
-            <strong style="font-size: 14px;">${addressText}</strong>
+          <div class="ficha-span">
+            <span class="ficha-label">Endereço:</span>
+            <strong class="ficha-value">${escapeHtml(addressText)}</strong>
           </div>
-          <div style="grid-column: 1 / -1; background:#FFFCF5; border:1px solid var(--color-gold-light); padding:12px;">
-            <span style="color: var(--color-text-muted); display: block; margin-bottom: 8px; font-weight:600;">Documentação anexa:</span>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px;">
+          <div class="ficha-box">
+            <span class="ficha-box-title">Documentação anexa:</span>
+            <div class="ficha-docs-grid">
               <div>${docLink(emp.rg_frente_url,'RG — Frente')}</div>
               <div>${docLink(emp.rg_verso_url,'RG — Verso')}</div>
               <div>${docLink(emp.cpf_doc_url,'CPF — Cópia')}</div>
               <div>${docLink(emp.comprovante_endereco_url,'Comprovante Endereço')}</div>
-              <div style="grid-column:1/-1;">${docLink(emp.ctps_doc_url,'Carteira de Trabalho — Cópia')}</div>
+              <div class="ficha-span">${docLink(emp.ctps_doc_url,'Carteira de Trabalho — Cópia')}</div>
             </div>
           </div>
            <div>
-            <span style="color: var(--color-text-muted); display: block; margin-bottom: 2px;">Salário (fixo do cargo):</span>
-            <strong style="color:var(--color-success);">${salarioView}</strong>
+            <span class="ficha-label">Salário (fixo do cargo):</span>
+            <strong class="text-success-strong">${salarioView}</strong>
           </div>
-          <div style="grid-column:1/-1; background:#FFFCF5; border:1px solid var(--color-gold-light); padding:12px;">
-            <span style="color: var(--color-text-muted); display: block; margin-bottom: 8px; font-weight:600;">Arquivos diversos — Certificados / Docs filhos:</span>
+          <div class="ficha-box">
+            <span class="ficha-box-title">Arquivos diversos — Certificados / Docs filhos:</span>
             <div>${diversosHtml}</div>
           </div>
           <div>
-            <span style="color: var(--color-text-muted); display: block; margin-bottom: 2px;">Status no Fluxo:</span>
-            <strong>${emp.status || 'Sem dados'}</strong>
+            <span class="ficha-label">Status no Fluxo:</span>
+            <strong>${escapeHtml(emp.status || 'Sem dados')}</strong>
           </div>
           <div>
-            <span style="color: var(--color-text-muted); display: block; margin-bottom: 2px;">Vínculo:</span>
-            <span class="vinculo-badge ${vinculoClass}">${vinculo}</span>
+            <span class="ficha-label">Vínculo:</span>
+            <span class="vinculo-badge ${vinculoClass}">${escapeHtml(vinculo)}</span>
           </div>
           <div>
-            <span style="color: var(--color-text-muted); display: block; margin-bottom: 2px;">Data de Cadastro:</span>
+            <span class="ficha-label">Data de Cadastro:</span>
             <span class="mono">${emp.created_at ? new Date(emp.created_at).toLocaleString('pt-BR') : '-'}</span>
           </div>
           <div>
-            <span style="color: var(--color-text-muted); display: block; margin-bottom: 2px;">Última Atualização:</span>
+            <span class="ficha-label">Última Atualização:</span>
             <span class="mono">${emp.updated_at ? new Date(emp.updated_at).toLocaleString('pt-BR') : '-'}</span>
           </div>
         </div>
       </div>
     `;
+    hydratePhotos(viewContent);
     if (window.BiofirmAnimations) window.BiofirmAnimations.openModalAnimated(viewModal);
     else viewModal.classList.add('active');
   };
@@ -1306,7 +1423,8 @@ document.addEventListener('DOMContentLoaded', function() {
     doc.setFontSize(7); doc.text(`Vínculo: ${emp.vinculo||'Ativo'}  ·  Status: ${emp.status||'Sem dados'}`, margin, y);
     // Foto à direita
     if(emp.foto_url){
-      const dataUrl = await getImageDataUrl(emp.foto_url);
+      const fotoResolved = await resolveDocUrl(emp.foto_url);
+      const dataUrl = fotoResolved ? await getImageDataUrl(fotoResolved) : null;
       if(dataUrl){
         try{ doc.addImage(dataUrl, 'JPEG', pageW - margin - 26, 16, 26, 26); }catch(e){}
       }
@@ -1353,7 +1471,7 @@ document.addEventListener('DOMContentLoaded', function() {
     row('Bairro', emp.bairro || '-');
     row('Cidade/UF', `${emp.cidade||'-'}${emp.uf?' - '+emp.uf:''}`);
 
-    section('Documentação anexa (links)');
+    section('Documentação anexa (links assinados — válidos por 1h)');
     const docs = [
       ['RG — Frente', emp.rg_frente_url],
       ['RG — Verso', emp.rg_verso_url],
@@ -1361,22 +1479,32 @@ document.addEventListener('DOMContentLoaded', function() {
       ['Comprovante endereço', emp.comprovante_endereco_url],
       ['Carteira Trabalho', emp.ctps_doc_url],
     ];
-    docs.forEach(([label, url])=>{
-      row(label, url ? url : 'pendente');
-      if(url && y < 275){
+    for (const [label, stored] of docs) {
+      const resolved = stored ? await resolveDocUrl(stored) : '';
+      row(label, resolved ? 'documento anexo — abrir link' : 'pendente');
+      if (resolved && y < 275) {
         doc.setFontSize(6); doc.setTextColor(59,105,120);
-        // link clicável
-        const linkW = doc.getTextWidth(url);
-        if(linkW < pageW - margin*2) doc.link(margin+34, y-4, Math.min(linkW, pageW - margin*2 -34), 4, { url });
+        // link clicável (URL assinada, expira em 1h)
+        doc.link(margin+34, y-4, 80, 4, { url: resolved });
         doc.setTextColor(46,42,36);
       }
-    });
+    }
     // arquivos diversos
     let pdfDiversos = [];
     try{ const { data } = await supabaseClient.from('employee_documents').select('*').eq('employee_id', emp.id).order('created_at'); pdfDiversos = data||[]; }catch(e){}
     section('Arquivos diversos — Certificados / Docs filhos');
     if(pdfDiversos.length===0) row('Arquivos diversos', 'nenhum');
-    else pdfDiversos.forEach(d=>{ row((d.tipo==='certificado'?'Certificado': d.tipo==='doc_filho'?'Doc. filho':'Outro')+' — '+d.titulo, d.url || '-'); });
+    else {
+      for (const d of pdfDiversos) {
+        const resolved = d.url ? await resolveDocUrl(d.url) : '';
+        row((d.tipo==='certificado'?'Certificado': d.tipo==='doc_filho'?'Doc. filho':'Outro')+' — '+d.titulo, resolved ? 'documento anexo — abrir link' : '-');
+        if (resolved && y < 275) {
+          doc.setFontSize(6); doc.setTextColor(59,105,120);
+          doc.link(margin+34, y-4, 80, 4, { url: resolved });
+          doc.setTextColor(46,42,36);
+        }
+      }
+    }
 
     section('Metadados');
     row('ID', String(emp.id));
@@ -1424,6 +1552,16 @@ document.addEventListener('DOMContentLoaded', function() {
         else fotoChoiceModal.classList.remove('active');
       }
     }
+  });
+
+  // Links de documentos: resolve URL assinada sob demanda (bucket privado)
+  document.addEventListener('click', async function(e){
+    const a = e.target.closest('a[data-doc-ref]');
+    if(!a) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const url = await resolveDocUrl(a.getAttribute('data-doc-ref'));
+    if(url) window.open(url, '_blank', 'noopener');
   });
 
   // Inicializar busca

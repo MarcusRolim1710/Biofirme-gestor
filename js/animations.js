@@ -222,7 +222,6 @@
       }
     }, 1000);
   }
-  }
 
   function animateTableRows() {
     withGsap(function () {

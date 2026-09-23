@@ -41,7 +41,11 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (err) {
       var AnimErr = getAnim();
       if (AnimErr) { AnimErr.loginButtonLoading(false); AnimErr.shakeLoginCard(); }
-      alert(err.message || 'Erro de conexão com o banco de dados.');
+      var msg = (err && err.message) || '';
+      if (/invalid login credentials/i.test(msg)) msg = 'Usuário ou senha inválidos.';
+      else if (/email not confirmed/i.test(msg)) msg = 'E-mail ainda não confirmado. Fale com o administrador.';
+      else if (!msg) msg = 'Erro de conexão com o banco de dados.';
+      alert(msg);
     }
   });
 
