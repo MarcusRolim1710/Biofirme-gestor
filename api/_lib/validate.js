@@ -14,6 +14,16 @@ const EMPLOYEE_STATUS = [
 ];
 
 const EMPLOYEE_VINCULO = ['Ativo', 'Inativo', 'Demitido', 'Afastado', 'Férias'];
+const EMPLOYEE_SEXO = ['Feminino', 'Masculino', 'Outro'];
+const EMPLOYEE_ESTADO_CIVIL = [
+  'Solteiro(a)',
+  'Casado(a)',
+  'União estável',
+  'Divorciado(a)',
+  'Separado(a)',
+  'Viúvo(a)',
+];
+const ESTADOS_CIVIS_COM_CONJUGE = ['Casado(a)', 'União estável'];
 const DOCUMENT_TYPES = ['certificado', 'doc_filho', 'outro'];
 
 const EMPLOYEE_TEXT_FIELDS = {
@@ -28,6 +38,10 @@ const EMPLOYEE_TEXT_FIELDS = {
   cpf_doc_url: 600,
   comprovante_endereco_url: 600,
   ctps_doc_url: 600,
+  sexo: 20,
+  estado_civil: 30,
+  nome_conjuge: 200,
+  telefone_conjuge: 40,
   telefone: 40,
   email: 200,
   cargo: 200,
@@ -126,6 +140,26 @@ function pickEmployeeFields(body, { partial }) {
     payload.vinculo = vinculo || 'Ativo';
   }
 
+  if (body.sexo !== undefined) {
+    const sexo = cleanText(body.sexo, 20);
+    if (sexo && !EMPLOYEE_SEXO.includes(sexo)) {
+      throw new HttpError(400, 'Sexo invalido.');
+    }
+    payload.sexo = sexo;
+  }
+
+  if (body.estado_civil !== undefined) {
+    const estadoCivil = cleanText(body.estado_civil, 30);
+    if (estadoCivil && !EMPLOYEE_ESTADO_CIVIL.includes(estadoCivil)) {
+      throw new HttpError(400, 'Estado civil invalido.');
+    }
+    payload.estado_civil = estadoCivil;
+    if (!ESTADOS_CIVIS_COM_CONJUGE.includes(estadoCivil)) {
+      payload.nome_conjuge = null;
+      payload.telefone_conjuge = null;
+    }
+  }
+
   if (!partial) {
     if (!payload.name) throw new HttpError(400, 'Nome e obrigatorio.');
     if (!payload.cpf) throw new HttpError(400, 'CPF e obrigatorio.');
@@ -156,6 +190,34 @@ function pickPositionFields(body, { partial }) {
   }
 
   return payload;
+}
+
+function pickDependentFields(body) {
+  const payload = {};
+  if (body.id !== undefined) payload.id = cleanInt(body.id);
+  if (body.nome !== undefined) payload.nome = cleanText(body.nome, 200);
+  if (body.data_nascimento !== undefined) payload.data_nascimento = cleanDate(body.data_nascimento);
+  if (body.rg !== undefined) payload.rg = cleanText(body.rg, 30);
+  if (body.cpf !== undefined) payload.cpf = cleanText(body.cpf, 20);
+  if (!payload.nome) throw new HttpError(400, 'Nome do filho e obrigatorio.');
+  return payload;
+}
+
+function pickDependents(value) {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) throw new HttpError(400, 'Lista de filhos invalida.');
+  const seenIds = new Set();
+  return value.map((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw new HttpError(400, 'Filho invalido.');
+    }
+    const dep = pickDependentFields(item);
+    if (dep.id !== undefined && dep.id !== null) {
+      if (seenIds.has(dep.id)) throw new HttpError(400, 'Filho duplicado na lista.');
+      seenIds.add(dep.id);
+    }
+    return dep;
+  });
 }
 
 function pickDocumentFields(body, { partial }) {
@@ -192,8 +254,12 @@ function pickDocumentFields(body, { partial }) {
 module.exports = {
   EMPLOYEE_STATUS,
   EMPLOYEE_VINCULO,
+  EMPLOYEE_SEXO,
+  EMPLOYEE_ESTADO_CIVIL,
+  ESTADOS_CIVIS_COM_CONJUGE,
   DOCUMENT_TYPES,
   pickEmployeeFields,
   pickPositionFields,
+  pickDependents,
   pickDocumentFields,
 };

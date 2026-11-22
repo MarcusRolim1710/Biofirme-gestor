@@ -988,6 +988,16 @@ body.login-body {
 .doc-item-meta { font-size: 11px; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .doc-item-remove { margin-left: 8px; }
 
+/* Filhos / dependentes */
+.campo-conjuge-oculto { display: none !important; }
+.filhos-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
+.filhos-empty { color: var(--color-text-muted); font-size: 12px; }
+.filho-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; padding: 10px; border: 1px solid var(--color-gold-light); background: #FFFDF9; }
+.filho-row .field { flex: 1 1 150px; min-width: 130px; margin: 0; }
+.filho-row .filho-idade-wrap { flex: 0 0 70px; min-width: 60px; }
+.filho-idade { display: block; padding-top: 6px; font-size: 12px; font-weight: 600; color: var(--color-text-muted); }
+.btn-remove-filho { margin-bottom: 2px; }
+
 /* Modal de cargos */
 .cargo-modal-note { font-size: 13px; color: var(--color-text-muted); margin-bottom: 14px; }
 .cargo-form-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: flex-end; }

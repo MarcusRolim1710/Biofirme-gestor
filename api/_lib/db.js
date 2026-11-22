@@ -25,4 +25,14 @@ async function one(text, params = []) {
   return rows[0] || null;
 }
 
-module.exports = { query, one };
+/**
+ * Executa uma lista de queries em um unico lote atomico (batch transaction).
+ * Cada item deve ter { text, params }; o retorno e um array com as linhas de cada query.
+ */
+async function withTransaction(operations) {
+  const sql = sqlClient();
+  const prepared = operations.map((op) => sql.query(op.text, op.params || []));
+  return sql.transaction(prepared);
+}
+
+module.exports = { query, one, withTransaction };

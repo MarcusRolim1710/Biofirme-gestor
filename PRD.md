@@ -52,6 +52,14 @@ Centralizar toda a documentação do funcionário em um único local, com valida
 - `employees.data_admissao` (`date`, opcional) informada no cadastro no formato `DD/MM/AAAA` e enviada como `AAAA-MM-DD`.
 - `tempoDeEmpresa()` calcula anos, meses e dias a partir da admissão; exibido no formulário, na ficha lateral, no modal de visualização e no PDF.
 
+### Dados familiares
+- `employees.sexo` (`Feminino`, `Masculino`, `Outro`) e `employees.estado_civil` (`Solteiro(a)`, `Casado(a)`, `União estável`, `Divorciado(a)`, `Separado(a)`, `Viúvo(a)`), ambos opcionais.
+- `nome_conjuge` e `telefone_conjuge` (contato de emergência) aparecem somente para `Casado(a)` ou `União estável`; ao trocar para outro estado civil, a API e a interface limpam ambos os campos.
+- Tabela `employee_dependents` (`employee_id` com FK `ON DELETE CASCADE`, `nome`, `data_nascimento`, `rg`, `cpf`). Um funcionário pode ter vários filhos; RG e CPF são opcionais.
+- A idade é calculada no cliente por `idadeFromNascimento()` a partir de `data_nascimento` — não há coluna de idade gravada.
+- No cadastro: criação atômica (CTE única) e atualização em lote transacional (`withTransaction`); IDs de dependentes de outro funcionário são rejeitados com HTTP 400.
+- `filhos` é sempre enviado no payload do formulário e preservado em `PATCH` que omite a lista.
+
 ### Arquivos diversos
 - Tabela `employee_documents` (`tipo`: `certificado`, `doc_filho`, `outro`; `titulo`, `url`, `mime`, `tamanho_bytes`).
 - Fila `pendingDiversos` para criação e envio imediato em edição.
@@ -62,12 +70,13 @@ Centralizar toda a documentação do funcionário em um único local, com valida
 - RG de 7 a 13 dígitos, máscara `00.000.000-00000`.
 - CTPS `000000/000-0`, PIS/PASEP `000.00000.00-0`.
 - CEP via ViaCEP; telefone `(00) 00000-0000`.
-- Validação no servidor em `api/_lib/validate.js` (whitelist de campos, limites, status/vínculo, tipos e tamanhos).
+- Validação no servidor em `api/_lib/validate.js` (whitelist de campos, limites, status/vínculo, sexo/estado civil, tipos e tamanhos).
+- Filhos: nome obrigatório por linha, data de nascimento válida e não futura, CPF com dígito verificador quando informado.
 
 ### Dashboard e exportação
 - Métricas em tempo real: Total, Ativos, Pendentes, Aprovados.
 - Filtros por nome, CPF, cargo, setor, status e vínculo.
-- Exportação da ficha em PDF (`jsPDF`) com foto, anexos, salário (com indicador de personalizado), data de admissão, tempo de empresa e arquivos diversos.
+- Exportação da ficha em PDF (`jsPDF`) com foto, anexos, salário (com indicador de personalizado), data de admissão, tempo de empresa, dados familiares (sexo, estado civil, cônjuge e filhos com idade/RG/CPF) e arquivos diversos.
 
 ### Responsividade
 - Header com hamburger (`btnMobileNav`) abaixo de 768px.
@@ -120,7 +129,7 @@ Criados/atualizados por `npm run db:seed`, com senhas lidas de `.env.local` (`SE
 ## 6. Fluxos de Trabalho
 1. Gestor cria cargo com salário base.
 2. Gestor cria funcionário → status *Sem dados*; cargo obrigatório, salário preenchido com o base do cargo e admissão opcional. O salário pode ser ajustado no cadastro; limpar o campo restaura o padrão do cargo.
-3. Gestor/colaborador preenche dados pessoais, admissão e endereço e anexa os 5 documentos obrigatórios + arquivos diversos opcionais. Arquivos são comprimidos no navegador antes do upload.
+3. Gestor/colaborador preenche dados pessoais, admissão, dados familiares (sexo, estado civil, cônjuge quando aplicável e filhos) e endereço, e anexa os 5 documentos obrigatórios + arquivos diversos opcionais. Arquivos são comprimidos no navegador antes do upload.
 4. Status muda para *Pendente de Documentos* quando faltam anexos.
 5. RH revisa a ficha e aprova → *Aprovado pelo RH*.
 6. RH exporta PDF → *Enviado para Contabilidade*.

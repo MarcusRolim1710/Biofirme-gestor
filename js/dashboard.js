@@ -155,6 +155,14 @@ document.addEventListener('DOMContentLoaded', async function() {
   const cargoSalarioInfo = document.getElementById('cargoSalarioInfo');
   const empDataAdmissaoInput = document.getElementById('empDataAdmissao');
   const empTempoEmpresaInput = document.getElementById('empTempoEmpresa');
+  const empSexoInput = document.getElementById('empSexo');
+  const empEstadoCivilInput = document.getElementById('empEstadoCivil');
+  const campoConjuge = document.getElementById('campoConjuge');
+  const empNomeConjugeInput = document.getElementById('empNomeConjuge');
+  const empTelConjugeInput = document.getElementById('empTelConjuge');
+  const listaFilhos = document.getElementById('listaFilhos');
+  const btnAddFilho = document.getElementById('btnAddFilho');
+  const ESTADOS_CIVIS_COM_CONJUGE = ['Casado(a)', 'União estável'];
   const divDocTipoInput = document.getElementById('divDocTipo');
   const divDocTituloInput = document.getElementById('divDocTitulo');
   const divDocFileInput = document.getElementById('divDocFile');
@@ -223,6 +231,132 @@ document.addEventListener('DOMContentLoaded', async function() {
   }
   function atualizarTempoEmpresa(){
     if(empTempoEmpresaInput) empTempoEmpresaInput.value = tempoDeEmpresa(empDataAdmissaoInput ? empDataAdmissaoInput.value : '');
+  }
+
+  // 1b. Dados familiares (sexo, estado civil, cônjuge e filhos)
+  let filhosFormState = []; // { id?, nome, data_nascimento (DD/MM/AAAA), rg, cpf }
+
+  function idadeFromNascimento(value){
+    const iso = toISODate(value);
+    if(!iso) return '';
+    const inicio = new Date(`${iso}T00:00:00`);
+    const hoje = new Date();
+    if(inicio > hoje) return 'Data futura';
+    let anos = hoje.getFullYear() - inicio.getFullYear();
+    let meses = hoje.getMonth() - inicio.getMonth();
+    if(hoje.getDate() < inicio.getDate()) meses -= 1;
+    if(meses < 0){ anos -= 1; meses += 12; }
+    const partes = [];
+    if(anos > 0) partes.push(`${anos} ${anos === 1 ? 'ano' : 'anos'}`);
+    if(meses > 0) partes.push(`${meses} ${meses === 1 ? 'mês' : 'meses'}`);
+    if(partes.length === 0) partes.push('menos de 1 mês');
+    return partes.join(' e ');
+  }
+
+  function normalizeFilho(filho){
+    const src = filho || {};
+    return {
+      id: src.id != null ? String(src.id) : undefined,
+      nome: src.nome || '',
+      data_nascimento: src.data_nascimento ? formatDateBR(src.data_nascimento) : '',
+      rg: src.rg || '',
+      cpf: src.cpf || '',
+    };
+  }
+
+  function renderFilhos(){
+    if(!listaFilhos) return;
+    if(filhosFormState.length === 0){
+      listaFilhos.innerHTML = '<li class="filhos-empty">Nenhum filho cadastrado.</li>';
+      return;
+    }
+    listaFilhos.innerHTML = filhosFormState.map(function(filho, index){
+      return `<li class="filho-row" data-filho-index="${index}">
+        <div class="field">
+          <label for="filhoNome${index}">Nome</label>
+          <input type="text" id="filhoNome${index}" data-filho-field="nome" value="${escapeHtml(filho.nome)}" placeholder="Nome completo">
+        </div>
+        <div class="field">
+          <label for="filhoNasc${index}">Nascimento</label>
+          <input type="text" id="filhoNasc${index}" data-filho-field="data_nascimento" data-mask="date" value="${escapeHtml(filho.data_nascimento)}" placeholder="DD/MM/AAAA" maxlength="10">
+        </div>
+        <div class="field filho-idade-wrap">
+          <span class="filho-idade" data-filho-idade="${index}">${escapeHtml(idadeFromNascimento(filho.data_nascimento) || '—')}</span>
+        </div>
+        <div class="field">
+          <label for="filhoRg${index}">RG</label>
+          <input type="text" id="filhoRg${index}" data-filho-field="rg" data-mask="rg" value="${escapeHtml(filho.rg)}" placeholder="00.000.000-0" maxlength="13">
+        </div>
+        <div class="field">
+          <label for="filhoCpf${index}">CPF</label>
+          <input type="text" id="filhoCpf${index}" data-filho-field="cpf" data-mask="cpf" value="${escapeHtml(filho.cpf)}" placeholder="000.000.000-00" maxlength="14">
+        </div>
+        <button type="button" class="action-btn action-btn-danger btn-remove-filho" data-filho-remove="${index}" aria-label="Remover filho ${index + 1}">Remover</button>
+      </li>`;
+    }).join('');
+
+    listaFilhos.querySelectorAll('[data-filho-field]').forEach(function(input){
+      const mask = input.getAttribute('data-mask');
+      if(mask && window.BiofirmeMasks) window.BiofirmeMasks.bind(input, mask);
+      input.addEventListener('input', function(){
+        const row = input.closest('.filho-row');
+        if(!row) return;
+        const index = Number(row.getAttribute('data-filho-index'));
+        const field = input.getAttribute('data-filho-field');
+        if(!filhosFormState[index]) return;
+        filhosFormState[index][field] = input.value;
+        if(field === 'data_nascimento'){
+          const idadeEl = listaFilhos.querySelector(`[data-filho-idade="${index}"]`);
+          if(idadeEl) idadeEl.textContent = idadeFromNascimento(input.value) || '—';
+        }
+        removeFieldError(input);
+      });
+    });
+
+    listaFilhos.querySelectorAll('[data-filho-remove]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        sincronizarFilhosDesdeDOM();
+        const index = Number(btn.getAttribute('data-filho-remove'));
+        filhosFormState.splice(index, 1);
+        renderFilhos();
+      });
+    });
+  }
+
+  function sincronizarFilhosDesdeDOM(){
+    if(!listaFilhos) return;
+    listaFilhos.querySelectorAll('.filho-row').forEach(function(row){
+      const index = Number(row.getAttribute('data-filho-index'));
+      const filho = filhosFormState[index];
+      if(!filho) return;
+      row.querySelectorAll('[data-filho-field]').forEach(function(input){
+        filho[input.getAttribute('data-filho-field')] = input.value;
+      });
+    });
+  }
+
+  function syncCamposFamiliares(){
+    const estado = empEstadoCivilInput ? empEstadoCivilInput.value : '';
+    const mostrar = ESTADOS_CIVIS_COM_CONJUGE.indexOf(estado) !== -1;
+    if(campoConjuge) campoConjuge.classList.toggle('campo-conjuge-oculto', !mostrar);
+    if(!mostrar){
+      if(empNomeConjugeInput) empNomeConjugeInput.value = '';
+      if(empTelConjugeInput) empTelConjugeInput.value = '';
+    }
+  }
+
+  function payloadFilhos(){
+    return filhosFormState.map(function(filho){
+      const nasc = (filho.data_nascimento || '').trim();
+      const item = {
+        nome: (filho.nome || '').trim(),
+        data_nascimento: nasc ? toISODate(nasc) : null,
+        rg: (filho.rg || '').trim() || null,
+        cpf: (filho.cpf || '').trim() || null,
+      };
+      if(filho.id) item.id = filho.id;
+      return item;
+    });
   }
 
   // 2a. Cargos com salário fixo
@@ -544,6 +678,10 @@ document.addEventListener('DOMContentLoaded', async function() {
           <span class="detail-row-value">${escapeHtml(formatAddress(emp) || '-')}</span>
         </div>
         <div class="detail-row">
+          <span class="detail-row-label">Família:</span>
+          <span class="detail-row-value">${escapeHtml([emp.sexo, emp.estado_civil].filter(Boolean).join(' · ') || '-')}${(emp.filhos || []).length ? ' · ' + emp.filhos.length + ' filho(s)' : ''}</span>
+        </div>
+        <div class="detail-row">
           <span class="detail-row-label">Documentos:</span>
           <span class="detail-row-value detail-doc-count">${docsCount===5?'✅ Completo': docsCount+'/5'} ${emp.rg_frente_url?'· RG frente':''} ${emp.rg_verso_url?'· verso':''}</span>
         </div>
@@ -600,6 +738,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     if(cargoSalarioInfo) cargoSalarioInfo.textContent='Salário base do cargo — preenchido automaticamente e editável abaixo';
     if(empDataAdmissaoInput) empDataAdmissaoInput.value='';
     atualizarTempoEmpresa();
+    if(empSexoInput) empSexoInput.value='';
+    if(empEstadoCivilInput) empEstadoCivilInput.value='';
+    if(empNomeConjugeInput) empNomeConjugeInput.value='';
+    if(empTelConjugeInput) empTelConjugeInput.value='';
+    syncCamposFamiliares();
+    filhosFormState = []; renderFilhos();
     if(empSetorInput) empSetorInput.value='';
     pendingDiversos = []; employeeDiversos = []; renderDiversosList();
     if(divDocInfo) divDocInfo.textContent='';
@@ -633,6 +777,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
     if (empDataAdmissaoInput) empDataAdmissaoInput.value = emp.data_admissao ? formatDateBR(emp.data_admissao) : '';
     atualizarTempoEmpresa();
+    if(empSexoInput) empSexoInput.value = emp.sexo || '';
+    if(empEstadoCivilInput) empEstadoCivilInput.value = emp.estado_civil || '';
+    if(empNomeConjugeInput) empNomeConjugeInput.value = emp.nome_conjuge || '';
+    if(empTelConjugeInput) empTelConjugeInput.value = emp.telefone_conjuge || '';
+    syncCamposFamiliares();
+    filhosFormState = (emp.filhos || []).map(normalizeFilho);
+    renderFilhos();
     if (empSetorInput) empSetorInput.value = emp.setor || '';
     empVinculoInput.value = emp.vinculo || 'Ativo';
     empStatusInput.value = emp.status || 'Sem dados';
@@ -755,6 +906,12 @@ document.addEventListener('DOMContentLoaded', async function() {
           pendingDiversos=[]; employeeDiversos=[]; renderDiversosList(); if(divDocInfo) divDocInfo.textContent=''; if(divDocFileInput) divDocFileInput.value=''; if(divDocTituloInput) divDocTituloInput.value='';
           if(empSalarioInput) empSalarioInput.value=''; if(cargoSalarioInfo) cargoSalarioInfo.textContent='Salário base do cargo — preenchido automaticamente e editável abaixo';
           if(empDataAdmissaoInput) empDataAdmissaoInput.value=''; atualizarTempoEmpresa();
+          if(empSexoInput) empSexoInput.value='';
+          if(empEstadoCivilInput) empEstadoCivilInput.value='';
+          if(empNomeConjugeInput) empNomeConjugeInput.value='';
+          if(empTelConjugeInput) empTelConjugeInput.value='';
+          syncCamposFamiliares();
+          filhosFormState=[]; renderFilhos();
           if(fotoPreviewWrap) fotoPreviewWrap.style.backgroundImage='';
           [empFotoInput, empRgFrenteInput, empRgVersoInput, empCpfDocInput, empCompEndInput, empCtpsDocInput].forEach(inp=>{ if(inp){ inp.value=''; delete inp._compressedFile; }});
         }
@@ -874,6 +1031,14 @@ document.addEventListener('DOMContentLoaded', async function() {
     empDataAdmissaoInput.addEventListener('change', atualizarTempoEmpresa);
   }
   if (empCargoInput) empCargoInput.addEventListener('change', syncSalarioFromCargo);
+  if (empEstadoCivilInput) empEstadoCivilInput.addEventListener('change', syncCamposFamiliares);
+  if (btnAddFilho) btnAddFilho.addEventListener('click', function(){
+    sincronizarFilhosDesdeDOM();
+    filhosFormState.push({ nome:'', data_nascimento:'', rg:'', cpf:'' });
+    renderFilhos();
+    const primeiroNome = listaFilhos && listaFilhos.querySelector('.filho-row:last-child input[data-filho-field="nome"]');
+    if(primeiroNome) primeiroNome.focus();
+  });
   // Cargos modal
   const cargoModal = document.getElementById('cargoModal');
   const btnManageCargos = document.getElementById('btnManageCargos');
@@ -1116,9 +1281,10 @@ document.addEventListener('DOMContentLoaded', async function() {
   bindDocInput(empCtpsDocInput, empCtpsDocUrlInput, 'infoCtpsDoc', 'previewCtpsDoc');
 
   function clearAllErrors() {
-    [empNameInput, empCpfInput, empRgInput, empCtpsNumeroInput, empPisInput, empCargoInput, empSetorInput, empSalarioInput, empDataAdmissaoInput, empCepInput, empNumeroInput].forEach(function (input) {
+    [empNameInput, empCpfInput, empRgInput, empCtpsNumeroInput, empPisInput, empCargoInput, empSetorInput, empSalarioInput, empDataAdmissaoInput, empCepInput, empNumeroInput, empEstadoCivilInput, empNomeConjugeInput, empTelConjugeInput].forEach(function (input) {
       if (input) removeFieldError(input);
     });
+    if(listaFilhos) listaFilhos.querySelectorAll('input').forEach(removeFieldError);
   }
 
   // Salvar Colaborador (POST ou PUT) — cadastro completo com uploads comprimidos
@@ -1149,6 +1315,34 @@ document.addEventListener('DOMContentLoaded', async function() {
       if (rgVal && !validateRG(rgVal)) { showFieldError(empRgInput, 'RG inválido.'); hasError = true; }
       if (admissaoRaw && !admissaoISO) { showFieldError(empDataAdmissaoInput, 'Informe uma data de admissão válida.'); hasError = true; }
       if (empSalarioInput && empSalarioInput.value.trim() && salarioValor == null) { showFieldError(empSalarioInput, 'Informe um salário válido.'); hasError = true; }
+
+      // Dados familiares
+      sincronizarFilhosDesdeDOM();
+      filhosFormState.forEach(function(filho, index){
+        const nomeField = listaFilhos ? listaFilhos.querySelector(`#filhoNome${index}`) : null;
+        const nascField = listaFilhos ? listaFilhos.querySelector(`#filhoNasc${index}`) : null;
+        const cpfField = listaFilhos ? listaFilhos.querySelector(`#filhoCpf${index}`) : null;
+        if(!(filho.nome || '').trim()){
+          showFieldError(nomeField, 'Informe o nome do filho ou remova a linha.');
+          hasError = true;
+        }
+        const nascRaw = (filho.data_nascimento || '').trim();
+        if(nascRaw){
+          const nascISO = toISODate(nascRaw);
+          if(!nascISO){
+            showFieldError(nascField, 'Informe uma data de nascimento válida.');
+            hasError = true;
+          } else if(new Date(nascISO + 'T00:00:00') > new Date()){
+            showFieldError(nascField, 'A data de nascimento não pode ser futura.');
+            hasError = true;
+          }
+        }
+        const cpfFilho = (filho.cpf || '').replace(/\D+/g, '');
+        if(cpfFilho && !validateCPF(cpfFilho)){
+          showFieldError(cpfField, 'CPF do filho inválido.');
+          hasError = true;
+        }
+      });
 
       // CPF duplicado — checagem local; a constraint unique do banco é o fallback
       const cpfDigits = cpfVal.replace(/\D+/g, '');
@@ -1195,6 +1389,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         cargo_id: cargoIdVal,
         salario: salarioPayload,
         data_admissao: admissaoISO,
+        sexo: empSexoInput ? empSexoInput.value.trim() : null,
+        estado_civil: empEstadoCivilInput ? empEstadoCivilInput.value.trim() : null,
+        nome_conjuge: empNomeConjugeInput ? empNomeConjugeInput.value.trim() : null,
+        telefone_conjuge: empTelConjugeInput ? empTelConjugeInput.value.trim() : null,
+        filhos: payloadFilhos(),
         // cargo/setor serão sincronizados pelo trigger sync_salario_from_position, mas enviamos fallback
         setor: empSetorInput.value.trim(),
         vinculo: empVinculoInput.value,
@@ -1284,6 +1483,20 @@ document.addEventListener('DOMContentLoaded', async function() {
     const docLink = (url,label) => url ? `<a href="#" data-doc-ref="${escapeHtml(url)}" class="doc-link">${label} — abrir</a>` : `<span class="doc-pending">${label} — pendente</span>`;
     const pos = emp.cargo_id ? positions.find(p=> String(p.id)===String(emp.cargo_id)) : null;
     const salarioView = emp.salario!=null ? formatMoneyBRL(emp.salario) : (pos? formatMoneyBRL(pos.salario_base) : '-');
+    const conjugeView = ESTADOS_CIVIS_COM_CONJUGE.indexOf(emp.estado_civil || '') !== -1
+      ? `${escapeHtml(emp.nome_conjuge || '-')}${emp.telefone_conjuge ? ' · ' + escapeHtml(emp.telefone_conjuge) : ''}`
+      : '-';
+    const filhosView = (emp.filhos || []).length
+      ? emp.filhos.map(function(f){
+          const detalhes = [
+            idadeFromNascimento(f.data_nascimento) ? 'idade ' + idadeFromNascimento(f.data_nascimento) : '',
+            f.data_nascimento ? 'nasc. ' + formatDateBR(f.data_nascimento) : '',
+            f.rg ? 'RG ' + formatRG(f.rg) : '',
+            f.cpf ? 'CPF ' + formatCPF(f.cpf) : '',
+          ].filter(Boolean).join(' · ');
+          return `<div class="ficha-doc-row"><strong>${escapeHtml(f.nome || '-')}</strong>${detalhes ? ' · ' + escapeHtml(detalhes) : ''}</div>`;
+        }).join('')
+      : '<span class="ficha-doc-empty">Nenhum filho cadastrado.</span>';
     // busca docs diversos para exibir na ficha
     let diversos = [];
     try{
@@ -1337,6 +1550,22 @@ document.addEventListener('DOMContentLoaded', async function() {
           <div>
             <span class="ficha-label">Tempo de empresa:</span>
             <strong>${escapeHtml(tempoDeEmpresa(emp.data_admissao) || '-')}</strong>
+          </div>
+          <div>
+            <span class="ficha-label">Sexo:</span>
+            <strong>${escapeHtml(emp.sexo || '-')}</strong>
+          </div>
+          <div>
+            <span class="ficha-label">Estado civil:</span>
+            <strong>${escapeHtml(emp.estado_civil || '-')}</strong>
+          </div>
+          <div class="ficha-span">
+            <span class="ficha-label">Cônjuge (contato de emergência):</span>
+            <strong>${conjugeView}</strong>
+          </div>
+          <div class="ficha-box ficha-span">
+            <span class="ficha-box-title">Filhos / dependentes:</span>
+            <div>${filhosView}</div>
           </div>
           <div class="ficha-box">
             <span class="ficha-box-title">Arquivos diversos — Certificados / Docs filhos:</span>
@@ -1456,6 +1685,26 @@ document.addEventListener('DOMContentLoaded', async function() {
     row('PIS/PASEP', emp.pis_pasep || '-');
     if(emp.email) row('Email', emp.email);
     if(emp.telefone) row('Telefone', emp.telefone);
+
+    section('Dados familiares');
+    row('Sexo', emp.sexo || '-');
+    row('Estado civil', emp.estado_civil || '-');
+    if(ESTADOS_CIVIS_COM_CONJUGE.indexOf(emp.estado_civil || '') !== -1){
+      row('Cônjuge', emp.nome_conjuge || '-');
+      row('Telefone do cônjuge', emp.telefone_conjuge || '-');
+    }
+    const pdfFilhos = emp.filhos || [];
+    if(pdfFilhos.length === 0) row('Filhos', 'nenhum cadastrado');
+    else pdfFilhos.forEach(function(filho, index){
+      const idade = idadeFromNascimento(filho.data_nascimento);
+      const detalhes = [
+        idade ? 'idade ' + idade : '',
+        filho.data_nascimento ? 'nasc. ' + formatDateBR(filho.data_nascimento) : '',
+        filho.rg ? 'RG ' + formatRG(filho.rg) : '',
+        filho.cpf ? 'CPF ' + formatCPF(filho.cpf) : '',
+      ].filter(Boolean).join(' · ');
+      row(`Filho ${index + 1} — ${filho.nome || '-'}`, detalhes || '-');
+    });
 
     section('Endereço');
     row('CEP', formatCEP(emp.cep) || '-');

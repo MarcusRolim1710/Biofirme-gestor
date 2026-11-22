@@ -187,6 +187,46 @@
             <input type="text" id="empPis" data-mask="pis" placeholder="000.00000.00-0" maxlength="14">
           </div>
           <div class="field">
+            <label for="empSexo">Sexo</label>
+            <select id="empSexo">
+              <option value="">Selecione</option>
+              <option value="Feminino">Feminino</option>
+              <option value="Masculino">Masculino</option>
+              <option value="Outro">Outro</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="empEstadoCivil">Estado civil</label>
+            <select id="empEstadoCivil">
+              <option value="">Selecione</option>
+              <option value="Solteiro(a)">Solteiro(a)</option>
+              <option value="Casado(a)">Casado(a)</option>
+              <option value="União estável">União estável</option>
+              <option value="Divorciado(a)">Divorciado(a)</option>
+              <option value="Separado(a)">Separado(a)</option>
+              <option value="Viúvo(a)">Viúvo(a)</option>
+            </select>
+          </div>
+          <fieldset class="field full-width form-fieldset campo-conjuge-oculto" id="campoConjuge">
+            <legend class="form-legend">Dados do cônjuge</legend>
+            <div class="form-grid mt-8">
+              <div class="field">
+                <label for="empNomeConjuge">Nome do cônjuge</label>
+                <input type="text" id="empNomeConjuge" placeholder="Nome completo">
+              </div>
+              <div class="field">
+                <label for="empTelConjuge">Telefone do cônjuge (emergência)</label>
+                <input type="text" id="empTelConjuge" data-mask="phone" placeholder="(00) 00000-0000" maxlength="15">
+              </div>
+            </div>
+          </fieldset>
+          <fieldset class="field full-width form-fieldset">
+            <legend class="form-legend">Filhos / dependentes</legend>
+            <p class="hint-text">Informe a data de nascimento para calcular a idade automaticamente. RG e CPF são opcionais.</p>
+            <ul id="listaFilhos" class="filhos-list"></ul>
+            <button type="button" id="btnAddFilho" class="btn-secondary btn-small mt-8">+ Adicionar filho</button>
+          </fieldset>
+          <div class="field">
             <label for="empCargo">Cargo / Função *</label>
             <div class="flex-gap-8">
               <select id="empCargo" class="flex-1">

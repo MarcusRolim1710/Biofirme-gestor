@@ -24,7 +24,7 @@ async function main() {
     "select table_name from information_schema.tables where table_schema = 'public' order by table_name"
   );
   const names = tables.map((row) => row.table_name);
-  const expected = ['employee_documents', 'employees', 'positions', 'profiles'];
+  const expected = ['employee_documents', 'employee_dependents', 'employees', 'positions', 'profiles'];
 
   for (const table of expected) {
     if (!names.includes(table)) throw new Error(`Tabela ausente: ${table}`);
@@ -34,7 +34,14 @@ async function main() {
     "select column_name from information_schema.columns where table_schema = 'public' and table_name = 'employees'"
   );
   const columnNames = columns.map((row) => row.column_name);
-  for (const column of ['data_admissao', 'salario_personalizado']) {
+  for (const column of [
+    'data_admissao',
+    'salario_personalizado',
+    'sexo',
+    'estado_civil',
+    'nome_conjuge',
+    'telefone_conjuge',
+  ]) {
     if (!columnNames.includes(column)) throw new Error(`Coluna ausente: employees.${column}`);
   }
 
