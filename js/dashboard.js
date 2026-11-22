@@ -153,6 +153,8 @@ document.addEventListener('DOMContentLoaded', async function() {
   // Cargo/Salário herdado + arquivos diversos
   const empSalarioInput = document.getElementById('empSalario');
   const cargoSalarioInfo = document.getElementById('cargoSalarioInfo');
+  const empDataAdmissaoInput = document.getElementById('empDataAdmissao');
+  const empTempoEmpresaInput = document.getElementById('empTempoEmpresa');
   const divDocTipoInput = document.getElementById('divDocTipo');
   const divDocTituloInput = document.getElementById('divDocTitulo');
   const divDocFileInput = document.getElementById('divDocFile');
@@ -173,6 +175,54 @@ document.addEventListener('DOMContentLoaded', async function() {
     const cleaned = str.replace(/[^0-9,]/g, '').replace(/\./g, '').replace(',', '.');
     const n = parseFloat(cleaned);
     return isNaN(n) ? null : n;
+  }
+  function formatDateBR(value){
+    if(!value) return '';
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(!match) return '';
+    return `${match[3]}/${match[2]}/${match[1]}`;
+  }
+  function toISODate(value){
+    const text = String(value || '').trim();
+    let day, month, year;
+    const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(isoMatch){
+      year = Number(isoMatch[1]); month = Number(isoMatch[2]); day = Number(isoMatch[3]);
+    } else {
+      const digits = text.replace(/\D+/g, '');
+      if(digits.length !== 8) return null;
+      day = Number(digits.slice(0, 2));
+      month = Number(digits.slice(2, 4));
+      year = Number(digits.slice(4, 8));
+    }
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if(date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+    return `${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+  }
+  function tempoDeEmpresa(value){
+    const iso = toISODate(value);
+    if(!iso) return '';
+    const inicio = new Date(`${iso}T00:00:00`);
+    const hoje = new Date();
+    if(inicio > hoje) return 'Data futura';
+    let anos = hoje.getFullYear() - inicio.getFullYear();
+    let meses = hoje.getMonth() - inicio.getMonth();
+    let dias = hoje.getDate() - inicio.getDate();
+    if(dias < 0){
+      meses -= 1;
+      dias += new Date(hoje.getFullYear(), hoje.getMonth(), 0).getDate();
+    }
+    if(meses < 0){ anos -= 1; meses += 12; }
+    const partes = [];
+    if(anos > 0) partes.push(`${anos} ${anos === 1 ? 'ano' : 'anos'}`);
+    if(meses > 0) partes.push(`${meses} ${meses === 1 ? 'mês' : 'meses'}`);
+    if(dias > 0 || partes.length === 0) partes.push(`${dias} ${dias === 1 ? 'dia' : 'dias'}`);
+    if(partes.length === 1) return partes[0];
+    if(partes.length === 2) return partes.join(' e ');
+    return `${partes.slice(0, -1).join(', ')} e ${partes[partes.length - 1]}`;
+  }
+  function atualizarTempoEmpresa(){
+    if(empTempoEmpresaInput) empTempoEmpresaInput.value = tempoDeEmpresa(empDataAdmissaoInput ? empDataAdmissaoInput.value : '');
   }
 
   // 2a. Cargos com salário fixo
@@ -227,11 +277,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     const pos = positions.find(p=> String(p.id)===String(id));
     if(pos){
       if(empSalarioInput) empSalarioInput.value = formatMoneyBRL(pos.salario_base);
-      if(cargoSalarioInfo) cargoSalarioInfo.textContent = `Salário fixo: ${formatMoneyBRL(pos.salario_base)} · Setor: ${pos.setor||'-'}`;
+      if(cargoSalarioInfo) cargoSalarioInfo.textContent = `Salário base: ${formatMoneyBRL(pos.salario_base)} · Setor: ${pos.setor||'-'} — valor editável`;
       if(empSetorInput) empSetorInput.value = pos.setor||'';
     } else {
       if(empSalarioInput) empSalarioInput.value = '';
-      if(cargoSalarioInfo) cargoSalarioInfo.textContent = 'Salário fixo definido no cargo — herdado automaticamente';
+      if(cargoSalarioInfo) cargoSalarioInfo.textContent = 'Salário base do cargo — preenchido automaticamente e editável abaixo';
       if(empSetorInput) empSetorInput.value = '';
     }
   }
@@ -473,7 +523,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         <div>
           <div class="detail-title">${escapeHtml(emp.name)}</div>
           <div class="detail-subtitle">${escapeHtml(emp.cargo || 'Cargo não informado')} · <span class="text-success-strong">${salarioTxt}</span></div>
-          <div class="detail-meta">${docsCount}/5 docs · CTPS: ${escapeHtml(emp.ctps_numero||'-')} · PIS: ${emp.pis_pasep? escapeHtml(window.BiofirmeMasks? window.BiofirmeMasks.MASKS.pis(emp.pis_pasep): emp.pis_pasep) : '-'}</div>
+          <div class="detail-meta">${docsCount}/5 docs · CTPS: ${escapeHtml(emp.ctps_numero||'-')} · PIS: ${emp.pis_pasep? escapeHtml(window.BiofirmeMasks? window.BiofirmeMasks.MASKS.pis(emp.pis_pasep): emp.pis_pasep) : '-'} · Admissão: ${escapeHtml(formatDateBR(emp.data_admissao)||'-')} · ${escapeHtml(tempoDeEmpresa(emp.data_admissao)||'—')}</div>
         </div>
       </div>
       <div class="detail-list">
@@ -547,7 +597,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     empStatusInput.value = 'Sem dados';
     if(empCargoInput) empCargoInput.value='';
     if(empSalarioInput) empSalarioInput.value='';
-    if(cargoSalarioInfo) cargoSalarioInfo.textContent='Salário fixo definido no cargo — herdado automaticamente';
+    if(cargoSalarioInfo) cargoSalarioInfo.textContent='Salário base do cargo — preenchido automaticamente e editável abaixo';
+    if(empDataAdmissaoInput) empDataAdmissaoInput.value='';
+    atualizarTempoEmpresa();
     if(empSetorInput) empSetorInput.value='';
     pendingDiversos = []; employeeDiversos = []; renderDiversosList();
     if(divDocInfo) divDocInfo.textContent='';
@@ -576,9 +628,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         empCargoInput.value = found ? String(found.id) : '';
       }
       syncSalarioFromCargo();
-      // se trigger ainda não herdou salário, mostra valor do cargo base
       if(emp.salario!=null && empSalarioInput) empSalarioInput.value = formatMoneyBRL(emp.salario);
+      if(emp.salario_personalizado && cargoSalarioInfo) cargoSalarioInfo.textContent = 'Salário personalizado — limpe o campo para voltar ao padrão do cargo.';
     }
+    if (empDataAdmissaoInput) empDataAdmissaoInput.value = emp.data_admissao ? formatDateBR(emp.data_admissao) : '';
+    atualizarTempoEmpresa();
     if (empSetorInput) empSetorInput.value = emp.setor || '';
     empVinculoInput.value = emp.vinculo || 'Ativo';
     empStatusInput.value = emp.status || 'Sem dados';
@@ -699,7 +753,8 @@ document.addEventListener('DOMContentLoaded', async function() {
           clearAddress();
           clearDocsPreview();
           pendingDiversos=[]; employeeDiversos=[]; renderDiversosList(); if(divDocInfo) divDocInfo.textContent=''; if(divDocFileInput) divDocFileInput.value=''; if(divDocTituloInput) divDocTituloInput.value='';
-          if(empSalarioInput) empSalarioInput.value=''; if(cargoSalarioInfo) cargoSalarioInfo.textContent='Salário fixo definido no cargo — herdado automaticamente';
+          if(empSalarioInput) empSalarioInput.value=''; if(cargoSalarioInfo) cargoSalarioInfo.textContent='Salário base do cargo — preenchido automaticamente e editável abaixo';
+          if(empDataAdmissaoInput) empDataAdmissaoInput.value=''; atualizarTempoEmpresa();
           if(fotoPreviewWrap) fotoPreviewWrap.style.backgroundImage='';
           [empFotoInput, empRgFrenteInput, empRgVersoInput, empCpfDocInput, empCompEndInput, empCtpsDocInput].forEach(inp=>{ if(inp){ inp.value=''; delete inp._compressedFile; }});
         }
@@ -800,7 +855,24 @@ document.addEventListener('DOMContentLoaded', async function() {
   }
   if (empCtpsNumeroInput && window.BiofirmeMasks) window.BiofirmeMasks.bind(empCtpsNumeroInput, 'ctps');
   if (empPisInput && window.BiofirmeMasks) window.BiofirmeMasks.bind(empPisInput, 'pis');
-  if (empSalarioInput && window.BiofirmeMasks) window.BiofirmeMasks.bind(empSalarioInput, 'money');
+  if (empSalarioInput && window.BiofirmeMasks) {
+    window.BiofirmeMasks.bind(empSalarioInput, 'money');
+    empSalarioInput.addEventListener('input', function(){
+      const base = positions.find(p=> String(p.id)===String(empCargoInput ? empCargoInput.value : ''));
+      if(base && cargoSalarioInfo){
+        const atual = parseMoneyBRL(empSalarioInput.value);
+        const igual = atual != null && Math.round(atual * 100) === Math.round(Number(base.salario_base) * 100);
+        cargoSalarioInfo.textContent = igual
+          ? `Salário base: ${formatMoneyBRL(base.salario_base)} · Setor: ${base.setor||'-'} — valor editável`
+          : `Salário personalizado · padrão do cargo: ${formatMoneyBRL(base.salario_base)}`;
+      }
+    });
+  }
+  if (empDataAdmissaoInput && window.BiofirmeMasks) {
+    window.BiofirmeMasks.bind(empDataAdmissaoInput, 'date');
+    empDataAdmissaoInput.addEventListener('input', atualizarTempoEmpresa);
+    empDataAdmissaoInput.addEventListener('change', atualizarTempoEmpresa);
+  }
   if (empCargoInput) empCargoInput.addEventListener('change', syncSalarioFromCargo);
   // Cargos modal
   const cargoModal = document.getElementById('cargoModal');
@@ -1044,7 +1116,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   bindDocInput(empCtpsDocInput, empCtpsDocUrlInput, 'infoCtpsDoc', 'previewCtpsDoc');
 
   function clearAllErrors() {
-    [empNameInput, empCpfInput, empRgInput, empCtpsNumeroInput, empPisInput, empCargoInput, empSetorInput, empSalarioInput, empCepInput, empNumeroInput].forEach(function (input) {
+    [empNameInput, empCpfInput, empRgInput, empCtpsNumeroInput, empPisInput, empCargoInput, empSetorInput, empSalarioInput, empDataAdmissaoInput, empCepInput, empNumeroInput].forEach(function (input) {
       if (input) removeFieldError(input);
     });
   }
@@ -1067,11 +1139,16 @@ document.addEventListener('DOMContentLoaded', async function() {
       const nameVal = empNameInput.value.trim();
       const cpfVal = empCpfInput.value.trim();
       const rgVal = empRgInput ? empRgInput.value.trim() : '';
+      const admissaoRaw = empDataAdmissaoInput ? empDataAdmissaoInput.value.trim() : '';
+      const admissaoISO = admissaoRaw ? toISODate(admissaoRaw) : null;
+      const salarioValor = parseMoneyBRL(empSalarioInput ? empSalarioInput.value : '');
 
       if (!nameVal) { showFieldError(empNameInput, 'Nome completo é obrigatório.'); hasError = true; }
       if (!cpfVal || !validateCPF(cpfVal)) { showFieldError(empCpfInput, 'CPF inválido.'); hasError = true; }
       if (!cargoIdVal) { showFieldError(empCargoInput, 'Selecione o cargo/função.'); hasError = true; }
       if (rgVal && !validateRG(rgVal)) { showFieldError(empRgInput, 'RG inválido.'); hasError = true; }
+      if (admissaoRaw && !admissaoISO) { showFieldError(empDataAdmissaoInput, 'Informe uma data de admissão válida.'); hasError = true; }
+      if (empSalarioInput && empSalarioInput.value.trim() && salarioValor == null) { showFieldError(empSalarioInput, 'Informe um salário válido.'); hasError = true; }
 
       // CPF duplicado — checagem local; a constraint unique do banco é o fallback
       const cpfDigits = cpfVal.replace(/\D+/g, '');
@@ -1104,6 +1181,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
       }
 
+      const posSelecionado = positions.find(p=> String(p.id)===String(cargoIdVal));
+      const salarioBaseCents = posSelecionado ? Math.round(Number(posSelecionado.salario_base) * 100) : null;
+      const salarioCents = salarioValor == null ? null : Math.round(salarioValor * 100);
+      const salarioPayload = salarioCents != null && salarioCents !== salarioBaseCents ? salarioValor : null;
+
       const payload = {
         name: empNameInput.value.trim(),
         cpf: empCpfInput.value.trim(),
@@ -1111,6 +1193,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         ctps_numero: empCtpsNumeroInput ? empCtpsNumeroInput.value.trim() : '',
         pis_pasep: empPisInput ? empPisInput.value.trim() : '',
         cargo_id: cargoIdVal,
+        salario: salarioPayload,
+        data_admissao: admissaoISO,
         // cargo/setor serão sincronizados pelo trigger sync_salario_from_position, mas enviamos fallback
         setor: empSetorInput.value.trim(),
         vinculo: empVinculoInput.value,
@@ -1214,7 +1298,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             <div>
               <h3 class="ficha-name">${escapeHtml(emp.name)}</h3>
               <p class="ficha-sub">${escapeHtml(emp.cargo || 'Cargo não especificado')} · ${escapeHtml(emp.setor || 'Setor não especificado')} · <span class="text-success-strong">${salarioView}</span></p>
-              <p class="mono ficha-meta">CTPS: ${escapeHtml(emp.ctps_numero || '-')} · PIS: ${escapeHtml(emp.pis_pasep || '-')} · Salário fixo do cargo: ${salarioView}</p>
+              <p class="mono ficha-meta">CTPS: ${escapeHtml(emp.ctps_numero || '-')} · PIS: ${escapeHtml(emp.pis_pasep || '-')} · Salário: ${salarioView}</p>
             </div>
           </div>
           <span class="vinculo-badge ${vinculoClass}">${escapeHtml(vinculo)}</span>
@@ -1243,8 +1327,16 @@ document.addEventListener('DOMContentLoaded', async function() {
             </div>
           </div>
            <div>
-            <span class="ficha-label">Salário (fixo do cargo):</span>
-            <strong class="text-success-strong">${salarioView}</strong>
+            <span class="ficha-label">Salário:</span>
+            <strong class="text-success-strong">${salarioView}${emp.salario_personalizado ? ' (personalizado)' : ''}</strong>
+          </div>
+          <div>
+            <span class="ficha-label">Data de admissão:</span>
+            <span class="mono">${escapeHtml(formatDateBR(emp.data_admissao) || '-')}</span>
+          </div>
+          <div>
+            <span class="ficha-label">Tempo de empresa:</span>
+            <strong>${escapeHtml(tempoDeEmpresa(emp.data_admissao) || '-')}</strong>
           </div>
           <div class="ficha-box">
             <span class="ficha-box-title">Arquivos diversos — Certificados / Docs filhos:</span>
@@ -1349,11 +1441,13 @@ document.addEventListener('DOMContentLoaded', async function() {
       y += Math.max(5, lines.length*4 + 1);
     }
 
-    section('Cargo / Função — Salário fixo');
+    section('Cargo / Função — Salário');
     row('Cargo', emp.cargo || '-');
     row('Setor', emp.setor || '-');
-    row('Salário (fixo do cargo)', emp.salario!=null ? formatMoneyBRL(emp.salario) : '-');
-    if(emp.cargo_id){ const p = positions.find(x=> String(x.id)===String(emp.cargo_id)); if(p) row('Salário base do cargo', formatMoneyBRL(p.salario_base)); }
+    row('Salário', `${emp.salario!=null ? formatMoneyBRL(emp.salario) : '-'}${emp.salario_personalizado ? ' (personalizado)' : ''}`);
+    if(emp.cargo_id){ const p = positions.find(x=> String(x.id)===String(emp.cargo_id)); if(p && emp.salario_personalizado) row('Salário base do cargo', formatMoneyBRL(p.salario_base)); }
+    row('Data de admissão', formatDateBR(emp.data_admissao) || '-');
+    row('Tempo de empresa', tempoDeEmpresa(emp.data_admissao) || '-');
 
     section('Dados pessoais');
     row('CPF', formatCPF(emp.cpf));

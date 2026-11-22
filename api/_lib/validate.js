@@ -76,6 +76,10 @@ function cleanDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
     throw new HttpError(400, 'Data invalida (use AAAA-MM-DD).');
   }
+  const date = new Date(`${text}T00:00:00Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== text) {
+    throw new HttpError(400, 'Data invalida (use AAAA-MM-DD).');
+  }
   return text;
 }
 
@@ -93,8 +97,17 @@ function pickEmployeeFields(body, { partial }) {
     payload.data_nascimento = cleanDate(body.data_nascimento);
   }
 
+  if (body.data_admissao !== undefined) {
+    payload.data_admissao = cleanDate(body.data_admissao);
+  }
+
   if (body.cargo_id !== undefined) {
     payload.cargo_id = cleanInt(body.cargo_id);
+  }
+
+  if (body.salario !== undefined) {
+    payload.salario = cleanMoney(body.salario);
+    payload.salario_personalizado = payload.salario !== null;
   }
 
   if (body.status !== undefined) {

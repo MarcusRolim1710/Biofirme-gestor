@@ -194,11 +194,20 @@
               </select>
               <button type="button" id="btnManageCargos" class="btn-secondary btn-small nowrap" title="Gerenciar cargos">⚙ Cargos</button>
             </div>
-            <span class="hint-text" id="cargoSalarioInfo">Salário fixo definido no cargo — herdado automaticamente</span>
+            <span class="hint-text" id="cargoSalarioInfo">Salário base do cargo — preenchido automaticamente e editável abaixo</span>
           </div>
           <div class="field">
-            <label for="empSalario">Salário (herdado do cargo)</label>
-            <input type="text" id="empSalario" data-mask="money" placeholder="R$ 0,00" readonly class="input-readonly">
+            <label for="empSalario">Salário</label>
+            <input type="text" id="empSalario" data-mask="money" placeholder="R$ 0,00">
+            <span class="hint-text">Valor inicial vem do cargo. Para voltar ao padrão, limpe o campo.</span>
+          </div>
+          <div class="field">
+            <label for="empDataAdmissao">Data de admissão</label>
+            <input type="text" id="empDataAdmissao" data-mask="date" placeholder="DD/MM/AAAA" maxlength="10">
+          </div>
+          <div class="field">
+            <label for="empTempoEmpresa">Tempo de empresa</label>
+            <input type="text" id="empTempoEmpresa" placeholder="—" readonly class="input-readonly">
           </div>
           <div class="field full-width" style="display:none;" id="fieldSetorManual">
             <label for="empSetor">Setor</label>
@@ -381,10 +390,10 @@
   <div class="modal-backdrop" id="cargoModal" role="dialog" aria-modal="true" aria-labelledby="cargoModalTitle">
     <div class="modal-card modal-card-md">
       <div class="modal-header">
-        <h2 class="modal-title" id="cargoModalTitle">Cargos & Setores — Salário fixo</h2>
+        <h2 class="modal-title" id="cargoModalTitle">Cargos & Setores — Salário base</h2>
         <button class="modal-close" id="btnCloseCargoModal" aria-label="Fechar">&times;</button>
       </div>
-      <p class="cargo-modal-note">Cada cargo tem um <strong>salário fixo</strong>. Ao vincular um funcionário ao cargo, o salário é herdado automaticamente (trigger <code>sync_salario_from_position</code>).</p>
+      <p class="cargo-modal-note">Cada cargo tem um <strong>salário base</strong>. Ao vincular um funcionário, o valor é preenchido automaticamente, mas pode ser ajustado no cadastro do funcionário sem alterar o cargo.</p>
       <div class="cargo-form-row">
         <div class="field cargo-field-nome">
           <label for="cargoNome">Nome do cargo *</label>
@@ -395,7 +404,7 @@
           <input type="text" id="cargoSetor" placeholder="Ex: Laboratório">
         </div>
         <div class="field cargo-field-salario">
-          <label for="cargoSalario">Salário fixo *</label>
+          <label for="cargoSalario">Salário base *</label>
           <input type="text" id="cargoSalario" data-mask="money" placeholder="R$ 0,00">
         </div>
         <button type="button" id="btnSaveCargo" class="btn-primary btn-small btn-h38">Salvar cargo</button>

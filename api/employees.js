@@ -56,6 +56,9 @@ async function update(req, res) {
 
   const body = await readJson(req);
   const payload = pickEmployeeFields(body, { partial: true });
+  if (payload.cargo_id !== undefined && payload.salario === undefined) {
+    payload.salario_personalizado = false;
+  }
   const keys = Object.keys(payload);
 
   if (!keys.length) return fail(res, 400, 'Nenhum campo para atualizar.');

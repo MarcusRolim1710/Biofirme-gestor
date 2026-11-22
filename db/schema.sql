@@ -36,11 +36,13 @@ CREATE TABLE IF NOT EXISTS employees (
   comprovante_endereco_url text,
   ctps_doc_url            text,
   data_nascimento         date,
+  data_admissao           date,
   telefone                text,
   email                   text,
   cargo                   text,
   cargo_id                bigint REFERENCES positions(id) ON DELETE SET NULL,
   salario                 numeric(12,2) CHECK (salario IS NULL OR salario >= 0),
+  salario_personalizado   boolean NOT NULL DEFAULT false,
   salario_moeda           text NOT NULL DEFAULT 'BRL',
   setor                   text,
   status                  text NOT NULL DEFAULT 'Sem dados'
@@ -66,6 +68,9 @@ CREATE TABLE IF NOT EXISTS employees (
   created_at              timestamptz NOT NULL DEFAULT now(),
   updated_at              timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS data_admissao date;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS salario_personalizado boolean NOT NULL DEFAULT false;
 
 -- ------------------------------------------------------------
 -- Usuarios da aplicacao (substitui auth.users do Supabase)
@@ -137,9 +142,11 @@ BEGIN
   IF NEW.cargo_id IS NOT NULL THEN
     SELECT * INTO pos FROM positions WHERE id = NEW.cargo_id;
     IF FOUND THEN
-      NEW.salario := pos.salario_base;
-      NEW.cargo   := pos.nome;
-      NEW.setor   := COALESCE(pos.setor, NEW.setor);
+      NEW.cargo := pos.nome;
+      NEW.setor := COALESCE(pos.setor, NEW.setor);
+      IF NEW.salario_personalizado IS DISTINCT FROM true THEN
+        NEW.salario := pos.salario_base;
+      END IF;
     END IF;
   END IF;
   RETURN NEW;
@@ -153,7 +160,7 @@ CREATE TRIGGER trg_employees_updated_at
 
 DROP TRIGGER IF EXISTS trg_employees_sync_salario ON employees;
 CREATE TRIGGER trg_employees_sync_salario
-  BEFORE INSERT OR UPDATE OF cargo_id ON employees
+  BEFORE INSERT OR UPDATE OF cargo_id, salario_personalizado ON employees
   FOR EACH ROW EXECUTE FUNCTION sync_salario_from_position();
 
 DROP TRIGGER IF EXISTS trg_positions_updated_at ON positions;

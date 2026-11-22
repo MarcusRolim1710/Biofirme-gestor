@@ -42,10 +42,15 @@ Centralizar toda a documentação do funcionário em um único local, com valida
 - Ficha lateral e modal com galeria de documentos e contador `X/5 docs`.
 - Exclusão remove também os objetos do storage referenciados.
 
-### Cargos com salário fixo herdado
+### Cargos com salário base e ajuste individual
 - Tabela `positions` (`nome` único, `setor`, `salario_base`, `descricao`).
-- `employees.cargo_id` com FK e trigger `sync_salario_from_position()` que copia `salario_base → salario` e sincroniza `cargo`/`setor`.
-- Salário no funcionário é somente leitura; fonte única é o cargo.
+- `employees.cargo_id` com FK e trigger `sync_salario_from_position()` que sincroniza `cargo`/`setor` e preenche `salario` com `salario_base` quando não há ajuste individual.
+- `employees.salario_personalizado` (padrão `false`): ao informar um salário no cadastro do funcionário, o valor é preservado; ao limpar o campo, volta a herdar o cargo.
+- Alterar o `salario_base` do cargo só atualiza quem ainda herda; salários personalizados não são sobrescritos.
+
+### Admissão e tempo de empresa
+- `employees.data_admissao` (`date`, opcional) informada no cadastro no formato `DD/MM/AAAA` e enviada como `AAAA-MM-DD`.
+- `tempoDeEmpresa()` calcula anos, meses e dias a partir da admissão; exibido no formulário, na ficha lateral, no modal de visualização e no PDF.
 
 ### Arquivos diversos
 - Tabela `employee_documents` (`tipo`: `certificado`, `doc_filho`, `outro`; `titulo`, `url`, `mime`, `tamanho_bytes`).
@@ -62,7 +67,7 @@ Centralizar toda a documentação do funcionário em um único local, com valida
 ### Dashboard e exportação
 - Métricas em tempo real: Total, Ativos, Pendentes, Aprovados.
 - Filtros por nome, CPF, cargo, setor, status e vínculo.
-- Exportação da ficha em PDF (`jsPDF`) com foto, anexos, salário do cargo e arquivos diversos.
+- Exportação da ficha em PDF (`jsPDF`) com foto, anexos, salário (com indicador de personalizado), data de admissão, tempo de empresa e arquivos diversos.
 
 ### Responsividade
 - Header com hamburger (`btnMobileNav`) abaixo de 768px.
@@ -89,7 +94,7 @@ Fonte da verdade: `db/schema.sql` (aplicável com `npm run db:migrate`).
 `id bigint PK`, `nome text unique`, `setor text`, `salario_base numeric(12,2)`, `descricao text`, `created_at`, `updated_at`.
 
 ### `employees`
-`id bigint PK`, dados pessoais (`name`, `cpf unique`, `rg`, `ctps_numero`, `pis_pasep`, `data_nascimento`, `telefone`, `email`), documentos (`foto_url`, `rg_frente_url`, `rg_verso_url`, `cpf_doc_url`, `comprovante_endereco_url`, `ctps_doc_url`), cargo (`cargo`, `cargo_id FK`, `salario`, `salario_moeda`), endereço (`cep`, `logradouro`, `numero`, `complemento`, `bairro`, `cidade`, `uf`), `status`, `vinculo`, `created_at`, `updated_at`.
+`id bigint PK`, dados pessoais (`name`, `cpf unique`, `rg`, `ctps_numero`, `pis_pasep`, `data_nascimento`, `data_admissao`, `telefone`, `email`), documentos (`foto_url`, `rg_frente_url`, `rg_verso_url`, `cpf_doc_url`, `comprovante_endereco_url`, `ctps_doc_url`), cargo (`cargo`, `cargo_id FK`, `salario`, `salario_personalizado`, `salario_moeda`), endereço (`cep`, `logradouro`, `numero`, `complemento`, `bairro`, `cidade`, `uf`), `status`, `vinculo`, `created_at`, `updated_at`.
 
 - `status`: `Sem dados`, `Pendente de Documentos`, `Aprovado pelo RH`, `Enviado para Contabilidade`, `Ativo`, `Inativo`, `Afastado`, `Férias`.
 - `vinculo`: `Ativo`, `Inativo`, `Demitido`, `Afastado`, `Férias`.
@@ -102,7 +107,7 @@ Fonte da verdade: `db/schema.sql` (aplicável com `npm run db:migrate`).
 
 ### Triggers
 - `set_updated_at()` em `employees`, `positions`, `profiles`.
-- `sync_salario_from_position()` em `employees` (`BEFORE INSERT OR UPDATE OF cargo_id`).
+- `sync_salario_from_position()` em `employees` (`BEFORE INSERT OR UPDATE OF cargo_id, salario_personalizado`).
 
 ### Usuários iniciais (seed)
 | Usuário | Email | Role |
@@ -113,9 +118,9 @@ Fonte da verdade: `db/schema.sql` (aplicável com `npm run db:migrate`).
 Criados/atualizados por `npm run db:seed`, com senhas lidas de `.env.local` (`SEED_PASSWORD_MARCUS`, `SEED_PASSWORD_GESTOR`) — nunca versionadas. Banco iniciado vazio, sem migração de dados antigos.
 
 ## 6. Fluxos de Trabalho
-1. Gestor cria cargo com salário fixo.
-2. Gestor cria funcionário → status *Sem dados*; cargo obrigatório, salário herdado.
-3. Gestor/colaborador preenche dados pessoais e endereço e anexa os 5 documentos obrigatórios + arquivos diversos opcionais. Arquivos são comprimidos no navegador antes do upload.
+1. Gestor cria cargo com salário base.
+2. Gestor cria funcionário → status *Sem dados*; cargo obrigatório, salário preenchido com o base do cargo e admissão opcional. O salário pode ser ajustado no cadastro; limpar o campo restaura o padrão do cargo.
+3. Gestor/colaborador preenche dados pessoais, admissão e endereço e anexa os 5 documentos obrigatórios + arquivos diversos opcionais. Arquivos são comprimidos no navegador antes do upload.
 4. Status muda para *Pendente de Documentos* quando faltam anexos.
 5. RH revisa a ficha e aprova → *Aprovado pelo RH*.
 6. RH exporta PDF → *Enviado para Contabilidade*.

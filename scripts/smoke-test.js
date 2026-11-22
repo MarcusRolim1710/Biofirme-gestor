@@ -30,6 +30,14 @@ async function main() {
     if (!names.includes(table)) throw new Error(`Tabela ausente: ${table}`);
   }
 
+  const columns = await query(
+    "select column_name from information_schema.columns where table_schema = 'public' and table_name = 'employees'"
+  );
+  const columnNames = columns.map((row) => row.column_name);
+  for (const column of ['data_admissao', 'salario_personalizado']) {
+    if (!columnNames.includes(column)) throw new Error(`Coluna ausente: employees.${column}`);
+  }
+
   const profiles = await query('select count(*)::int as total from profiles');
   if (!profiles[0] || profiles[0].total < 1) throw new Error('Nenhum usuario cadastrado.');
 

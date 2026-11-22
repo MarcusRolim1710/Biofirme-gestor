@@ -59,10 +59,10 @@ async function update(req, res) {
 
   if (!rows[0]) return fail(res, 404, 'Cargo nao encontrado.');
 
-  // Mantem o salario herdado dos funcionarios vinculados a este cargo.
+  // Atualiza apenas quem ainda usa o salario do cargo; ajustes individuais sao preservados.
   if (Object.prototype.hasOwnProperty.call(payload, 'salario_base')) {
     await query(
-      'update employees set salario = $1 where cargo_id = $2',
+      'update employees set salario = $1 where cargo_id = $2 and salario_personalizado is not true',
       [payload.salario_base, id]
     );
   }
