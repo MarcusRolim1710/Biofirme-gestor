@@ -2,7 +2,9 @@
 
 > **Sistema de Cadastro e Gestão de Colaboradores**  
 > Documento de rastreabilidade, status de entregas e planejamento de próximas etapas com base no [PRD.md](file:///c:/Biofirme/PRD.md) e requisitos operacionais.  
-> **Última atualização:** 02/09/2026 03:00 — Cargos com salário fixo + Arquivos diversos + Responsividade
+> **Última atualização:** 22/11/2026 — Migração para Neon Postgres + Neon Object Storage, API serverless, auth própria e compressão de imagens/PDFs.
+>
+> ⚠️ As fases 1–6 abaixo registram o histórico do projeto no antigo backend Supabase. O estado atual da arquitetura está na **Fase 7** e no [PRD.md](PRD.md). As chaves do Supabase que apareceram em versões antigas devem ser consideradas revogadas.
 
 ---
 
@@ -48,6 +50,7 @@ gantt
 | **Fase 4** | Storage + compressão + Cargos c/ salário fixo + Arquivos diversos + Responsividade ✅ / Painel colaborador pendente | 🔄 **Em progresso** | 85% |
 | **Fase 5** | Exportação PDF (com salário/diversos) ✅ / Reset senha pendente | 🔄 **Em progresso** | 50% |
 | **Fase 6** | PWA & Compliance (LGPD) | 📋 **Planejado** | 0% |
+| **Fase 7** | Migração Neon + API serverless + compressão | ✅ **Concluído (22/11)** | 100% |
 
 ---
 
@@ -201,16 +204,41 @@ gantt
 
 ---
 
-## 🔧 Stack Tecnológica Final (02/09/2026)
+## ✅ Fase 7: Migração para Neon (Concluída - 22/11/2026)
+
+### Entregas
+- ✅ **Neon Postgres**: projeto `biofirme`, branch `production`, PostgreSQL 18. Schema único em `db/schema.sql`, aplicado com `npm run db:migrate`. Banco iniciado vazio.
+- ✅ **API serverless** em `api/` (Vercel Functions): `auth`, `employees`, `positions`, `documents`, `uploads`, `files`, `health` + helpers em `api/_lib/` (`http`, `db`, `auth`, `storage`, `validate`).
+- ✅ **Autenticação própria**: `profiles.password_hash` com bcrypt (custo 12), JWT assinado com `AUTH_SECRET` em cookie `httpOnly; SameSite=Lax; Secure`. Validação server-side no carregamento do dashboard. RBAC nas APIs.
+- ✅ **Usuários seed**: `marcus.rolim` e `gestor.biofirm` (ambos admin, senha definida via `.env.local`).
+- ✅ **Neon Object Storage**: bucket privado `biofirme`, URL presigned de PUT (`/api/uploads`) e redirect assinado de GET (`/api/files?key=`). CORS configurado por `npm run storage:setup`.
+- ✅ **Remoção completa do Supabase**: SDK e `js/supabase.js` removidos; `js/api.js` adicionado; HTML atualizado; nenhuma credencial versionada.
+- ✅ **Compressão**: imagens (canvas → WebP/JPEG) e PDFs (pdf.js + jsPDF no cliente, com preservação do original se não houver economia). CLI `npm run compress` com modos `auto`/`lossless`/`raster` (auto: lossless primeiro, raster se economia < 15%).
+- ✅ **Correção**: syntax error preexistente em `js/animations.js` (chave extra) corrigido.
+- ✅ **Verificação**: `npm test` (DB + storage), teste de integração completo da API (login, CRUD de cargo/funcionário, presign, upload, leitura, documento, cascata, logout) e compressão (imagem 94%, PDF 47%).
+
+### Usuários atuais
+| Usuário | Role |
+|---------|------|
+| `marcus.rolim` | admin |
+| `gestor.biofirm` | admin |
+
+Senhas definidas em `.env.local`, nunca versionadas.
+
+---
+
+## 🔧 Stack Tecnológica Final (22/11/2026)
 
 | Camada | Tecnologia |
 |--------|------------|
-| **Frontend** | HTML5 + CSS3 + JavaScript vanilla + `js/mask.js` (`maskMoney`) + `js/compress.js` (canvas WebP) + responsividade hamburger/breakpoints 480/640/768/1024 (`css/style.css:885`) |
-| **Backend** | Supabase (PostgreSQL + Auth + RLS + Edge Functions + Storage `employee-docs` com subpastas `foto/diversos` + `positions`/`employee_documents` + trigger `sync_salario_from_position`) |
-| **Autenticação** | Supabase Auth (JWT automático) |
-| **Storage** | Supabase Storage `employee-docs` (público, 10MB, `jpeg/png/webp/pdf/heic`, subpastas `foto/*` e `diversos/*`, compressão ~75% para 1GB) |
-| **Hospedagem** | Vercel (frontend) + Supabase (backend) |
-| **Validações** | ViaCEP + CPF/RG 7-13/CTPS/PIS máscaras + `cargo_id` obrigatório + `maskMoney` |
+| **Frontend** | HTML5 + CSS3 + JavaScript vanilla + GSAP + `js/api.js` + `js/compress.js` + responsividade hamburger/breakpoints 480/640/768/1024 |
+| **Backend** | Vercel Functions (`api/`) com `@neondatabase/serverless` |
+| **Banco** | Neon Postgres — `db/schema.sql`, tabelas `employees`, `positions`, `profiles`, `employee_documents` |
+| **Autenticação** | bcryptjs + jsonwebtoken em cookie `httpOnly` (RBAC nas APIs) |
+| **Storage** | Neon Object Storage, bucket privado `biofirme`, presigned PUT/GET |
+| **Compressão** | Cliente (WebP + pdf.js/jsPDF) + CLI (sharp + pdf-lib + pdf.js) |
+| **Hospedagem** | Vercel (frontend + funções) |
+| **Validações** | ViaCEP + CPF/RG 7-13/CTPS/PIS máscaras + whitelist/validação no servidor |
 
 ---
 
@@ -228,34 +256,41 @@ gantt
 9. `create_employee_docs_bucket` (31/08) - Bucket `employee-docs` público 10MB + policies
 10. `add_positions_salario_e_docs_diversos` (02/09) - `positions` (nome unique, setor, salario_base, triggers/RLS) + `employees.cargo_id/salario/salario_moeda` + trigger `sync_salario_from_position` + backfill + `employee_documents` (tipo/titulo/url, RLS)
 
-### Arquivos Principais (02/09)
-- `index.html` - Login (viewport responsivo)
-- `dashboard.html` - Dashboard + cadastro completo (foto, CTPS/PIS, 5 anexos) + cargos/salário (select + cargoModal) + arquivos diversos + hamburger
-- `css/style.css` - Design System + file inputs documentais + responsividade (hamburger, breakpoints 480/640/768/1024)
+### Arquivos Principais (22/11)
+- `index.html` - Login
+- `dashboard.html` - Dashboard + cadastro completo + cargos/salário + arquivos diversos + hamburger
+- `css/style.css` - Design System + responsividade
 - `js/app.js` - Login
-- `js/dashboard.js` - CRUD + positions/salário herdado + arquivos diversos + hamburger + ficha/PDF com salário/diversos
-- `js/mask.js` - Máscaras (CPF, RG 7-13, CTPS, PIS, CEP, telefone, money)
-- `js/compress.js` - Compressão canvas WebP/JPEG para 1GB
-- `js/supabase.js` - Client Supabase
-- `.env` - SUPABASE_URL / KEYS
+- `js/api.js` - Cliente da API (substitui `js/supabase.js`)
+- `js/dashboard.js` - CRUD + cargos + arquivos diversos + ficha/PDF
+- `js/compress.js` - Compressão client-side de imagens e PDFs
+- `js/mask.js` - Máscaras (CPF, RG, CTPS, PIS, CEP, telefone, money)
+- `api/` - Vercel Functions + `api/_lib/`
+- `db/schema.sql` - Schema PostgreSQL (Neon)
+- `scripts/` - migrate, seed, setup-storage, compress, smoke-test, dev-server
+- `.env.local` - credenciais locais (gitignore)
 
 ### Comandos Úteis
 ```bash
-# Servir localmente
-npx http-server -p 8080 -c-1
-
-# Acessar
-http://localhost:8080
+npm install
+npm run db:migrate      # aplica db/schema.sql
+npm run db:seed         # cria os dois admins
+npm run storage:setup   # CORS + teste PUT/GET/DELETE
+npm run dev             # http://localhost:3000
+npm test                # smoke test (DB + storage)
+npm run compress -- <arquivo|pasta> --pdf-mode auto
 ```
 
 ---
 
-## 🎯 Próximos Passos Imediatos (02/09)
+## 🎯 Próximos Passos Imediatos (22/11)
 
-1. **Deploy Vercel** (frontend com cargos/salário + arquivos diversos + responsividade — já em produção `68ac274`)
-2. **Painel do colaborador** `/colaborador.html` com RLS por `auth.uid()` (reutiliza `employee-docs` + `employee_documents`)
-3. **Refinar PDF contábil** com layout de salário/diversos validado com RH
-4. **Validação CTPS/PIS dígito** + LGPD/PWA (Fase 6)
+1. **Configurar as variáveis de ambiente na Vercel** (ver README/PRD) e validar o deploy.
+2. **Revogar a antiga secret key do Supabase** que esteve versionada em versões anteriores do PRD.
+3. **Painel do colaborador** `/colaborador.html` com permissões por role nas APIs.
+4. **Reset de senha por gestor** (senha temporária + troca no primeiro login).
+5. **Refinar PDF contábil** com layout de salário/diversos validado com RH.
+6. **Validação CTPS/PIS dígito** + LGPD/PWA (Fase 6).
 
 ---
 
