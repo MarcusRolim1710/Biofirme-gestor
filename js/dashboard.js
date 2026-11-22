@@ -52,11 +52,11 @@ document.addEventListener('DOMContentLoaded', async function() {
   // 1. Verificação de Sessão (validada no servidor)
   let userData = null;
   try {
-    const session = await BiofirmAPI.auth.me();
+    const session = await BiofirmeAPI.auth.me();
     userData = session.user;
-    sessionStorage.setItem('biofirm_user', JSON.stringify(userData));
+    sessionStorage.setItem('biofirme_user', JSON.stringify(userData));
   } catch (err) {
-    sessionStorage.removeItem('biofirm_user');
+    sessionStorage.removeItem('biofirme_user');
     window.location.href = 'index.html';
     return;
   }
@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   const logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async function() {
-      await BiofirmAPI.auth.logout();
+      await BiofirmeAPI.auth.logout();
       window.location.href = 'index.html';
     });
   }
@@ -178,7 +178,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   // 2a. Cargos com salário fixo
   async function fetchPositions(){
     try{
-      positions = await BiofirmAPI.positions.list();
+      positions = await BiofirmeAPI.positions.list();
       renderCargoSelect();
       renderCargoList();
     }catch(err){ console.error('positions', err); }
@@ -211,13 +211,13 @@ document.addEventListener('DOMContentLoaded', async function() {
       document.getElementById('cargoSetor').value = p.setor||'';
       document.getElementById('cargoSalario').value = formatMoneyBRL(p.salario_base).replace('R$','').trim();
       document.getElementById('cargoSalario').dataset.editId = p.id;
-      if(window.BiofirmMasks) window.BiofirmMasks.bind(document.getElementById('cargoSalario'),'money');
+      if(window.BiofirmeMasks) window.BiofirmeMasks.bind(document.getElementById('cargoSalario'),'money');
     }));
     wrap.querySelectorAll('[data-cargo-del]').forEach(btn=> btn.addEventListener('click', async ()=> {
       const id = btn.getAttribute('data-cargo-del');
       if(!confirm('Excluir este cargo? Funcionários vinculados ficarão sem cargo_id mas mantêm cargo/salário atuais.')) return;
       try{
-        await BiofirmAPI.positions.remove(id);
+        await BiofirmeAPI.positions.remove(id);
         await fetchPositions();
       }catch(err){ alert('Erro: '+err.message); }
     }));
@@ -239,7 +239,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   async function fetchDiversos(employeeId){
     if(!employeeId) { employeeDiversos=[]; renderDiversosList(); return; }
     try{
-      employeeDiversos = await BiofirmAPI.documents.list(employeeId);
+      employeeDiversos = await BiofirmeAPI.documents.list(employeeId);
     }catch(err){
       console.error(err);
       employeeDiversos = [];
@@ -275,7 +275,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         } else {
           if(!confirm('Remover este arquivo diverso?')) return;
           try{
-            await BiofirmAPI.documents.remove(v);
+            await BiofirmeAPI.documents.remove(v);
             await fetchDiversos(employeeDiversos[0]? employeeDiversos[0].employee_id : null);
           }catch(err){ alert('Erro: '+friendlyError(err)); }
         }
@@ -286,7 +286,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   // 2. Carregar Dados da API
   async function fetchEmployees() {
     try {
-      employees = await BiofirmAPI.employees.list();
+      employees = await BiofirmeAPI.employees.list();
       render();
     } catch (err) {
       console.error(err);
@@ -339,9 +339,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     statPendentes.textContent = pendentes;
     statAprovados.textContent = aprovados;
     // GSAP: contador animado (se permitido)
-    if (window.BiofirmAnimations && !window.BiofirmAnimations.prefersReducedMotion()) {
+    if (window.BiofirmeAnimations && !window.BiofirmeAnimations.prefersReducedMotion()) {
       // adia 1 frame para DOM pintar antes de animar
-      requestAnimationFrame(function(){ window.BiofirmAnimations.animateStatCount(); });
+      requestAnimationFrame(function(){ window.BiofirmeAnimations.animateStatCount(); });
     }
   }
 
@@ -417,7 +417,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       tr.addEventListener('click', (e) => {
         if (e.target.closest('button[data-action]')) return;
         selectedEmployeeId = emp.id;
-        if (window.BiofirmAnimations) window.BiofirmAnimations.animateRowSelection(tr);
+        if (window.BiofirmeAnimations) window.BiofirmeAnimations.animateRowSelection(tr);
         renderTable(list);
         renderSidebarDetail();
       });
@@ -440,7 +440,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     // GSAP: stagger de entrada das linhas
-    if (window.BiofirmAnimations) window.BiofirmAnimations.animateTableRows();
+    if (window.BiofirmeAnimations) window.BiofirmeAnimations.animateTableRows();
   }
 
   // 6. Renderização da Ficha Lateral (1/3)
@@ -473,7 +473,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         <div>
           <div class="detail-title">${escapeHtml(emp.name)}</div>
           <div class="detail-subtitle">${escapeHtml(emp.cargo || 'Cargo não informado')} · <span class="text-success-strong">${salarioTxt}</span></div>
-          <div class="detail-meta">${docsCount}/5 docs · CTPS: ${escapeHtml(emp.ctps_numero||'-')} · PIS: ${emp.pis_pasep? escapeHtml(window.BiofirmMasks? window.BiofirmMasks.MASKS.pis(emp.pis_pasep): emp.pis_pasep) : '-'}</div>
+          <div class="detail-meta">${docsCount}/5 docs · CTPS: ${escapeHtml(emp.ctps_numero||'-')} · PIS: ${emp.pis_pasep? escapeHtml(window.BiofirmeMasks? window.BiofirmeMasks.MASKS.pis(emp.pis_pasep): emp.pis_pasep) : '-'}</div>
         </div>
       </div>
       <div class="detail-list">
@@ -521,10 +521,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     if (btnDetailEdit) btnDetailEdit.addEventListener('click', function(){ openEditModal(emp); });
     hydratePhotos(detailContent);
     detailContent.dataset.lastId = String(emp.id);
-    if (isSwitching && window.BiofirmAnimations) window.BiofirmAnimations.animateDetailSwitch();
-    else if (!isSwitching && window.BiofirmAnimations && !detailContent.dataset.animatedOnce) {
+    if (isSwitching && window.BiofirmeAnimations) window.BiofirmeAnimations.animateDetailSwitch();
+    else if (!isSwitching && window.BiofirmeAnimations && !detailContent.dataset.animatedOnce) {
       detailContent.dataset.animatedOnce = '1';
-      window.BiofirmAnimations.animateDetailSwitch();
+      window.BiofirmeAnimations.animateDetailSwitch();
     }
   }
 
@@ -555,7 +555,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     clearDocsPreview();
     if (fotoPreviewWrap) fotoPreviewWrap.style.backgroundImage = '';
     if (fotoInfo) fotoInfo.textContent = 'JPG/PNG/WebP até 10MB — será comprimida automaticamente';
-    if (window.BiofirmAnimations) window.BiofirmAnimations.openModalAnimated(employeeModal);
+    if (window.BiofirmeAnimations) window.BiofirmeAnimations.openModalAnimated(employeeModal);
     else employeeModal.classList.add('active');
   }
 
@@ -615,7 +615,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     if(divDocInfo) divDocInfo.textContent='';
     if(divDocFileInput) divDocFileInput.value='';
     if(divDocTituloInput) divDocTituloInput.value='';
-    if (window.BiofirmAnimations) window.BiofirmAnimations.openModalAnimated(employeeModal);
+    if (window.BiofirmeAnimations) window.BiofirmeAnimations.openModalAnimated(employeeModal);
     else employeeModal.classList.add('active');
   }
 
@@ -703,7 +703,7 @@ document.addEventListener('DOMContentLoaded', async function() {
           if(fotoPreviewWrap) fotoPreviewWrap.style.backgroundImage='';
           [empFotoInput, empRgFrenteInput, empRgVersoInput, empCpfDocInput, empCompEndInput, empCtpsDocInput].forEach(inp=>{ if(inp){ inp.value=''; delete inp._compressedFile; }});
         }
-       if (window.BiofirmAnimations) window.BiofirmAnimations.closeModalAnimated(employeeModal, doReset);
+       if (window.BiofirmeAnimations) window.BiofirmeAnimations.closeModalAnimated(employeeModal, doReset);
        else { employeeModal.classList.remove('active'); doReset(); }
      }
 
@@ -736,7 +736,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       err.textContent = msg;
       input.parentNode.appendChild(err);
       input.classList.add('field-invalid');
-      if (window.BiofirmAnimations && !window.BiofirmAnimations.prefersReducedMotion() && typeof gsap !== 'undefined') {
+      if (window.BiofirmeAnimations && !window.BiofirmeAnimations.prefersReducedMotion() && typeof gsap !== 'undefined') {
         gsap.killTweensOf(input);
         gsap.timeline().to(input, { x: -5, duration: 0.06 }).to(input, { x: 5, duration: 0.06 }).to(input, { x: -3, duration: 0.06 }).to(input, { x: 0, duration: 0.08 });
         gsap.from(err, { y: -4, autoAlpha: 0, duration: 0.2, ease: 'power2.out' });
@@ -793,14 +793,14 @@ document.addEventListener('DOMContentLoaded', async function() {
 
   if (empCepInput) {
     empCepInput.addEventListener('blur', searchCEP);
-    if (window.BiofirmMasks) window.BiofirmMasks.bind(empCepInput, 'cep');
+    if (window.BiofirmeMasks) window.BiofirmeMasks.bind(empCepInput, 'cep');
   }
   if (empRgInput) {
-    if (window.BiofirmMasks) window.BiofirmMasks.bind(empRgInput, 'rg');
+    if (window.BiofirmeMasks) window.BiofirmeMasks.bind(empRgInput, 'rg');
   }
-  if (empCtpsNumeroInput && window.BiofirmMasks) window.BiofirmMasks.bind(empCtpsNumeroInput, 'ctps');
-  if (empPisInput && window.BiofirmMasks) window.BiofirmMasks.bind(empPisInput, 'pis');
-  if (empSalarioInput && window.BiofirmMasks) window.BiofirmMasks.bind(empSalarioInput, 'money');
+  if (empCtpsNumeroInput && window.BiofirmeMasks) window.BiofirmeMasks.bind(empCtpsNumeroInput, 'ctps');
+  if (empPisInput && window.BiofirmeMasks) window.BiofirmeMasks.bind(empPisInput, 'pis');
+  if (empSalarioInput && window.BiofirmeMasks) window.BiofirmeMasks.bind(empSalarioInput, 'money');
   if (empCargoInput) empCargoInput.addEventListener('change', syncSalarioFromCargo);
   // Cargos modal
   const cargoModal = document.getElementById('cargoModal');
@@ -809,8 +809,8 @@ document.addEventListener('DOMContentLoaded', async function() {
   const btnCloseCargoModal = document.getElementById('btnCloseCargoModal');
   const btnCloseCargoBtn = document.getElementById('btnCloseCargoBtn');
   const btnSaveCargo = document.getElementById('btnSaveCargo');
-  function openCargoModal(){ if(!canManageCargos){ alert('Seu perfil não permite gerenciar cargos.'); return; } if(window.BiofirmAnimations) window.BiofirmAnimations.openModalAnimated(cargoModal); else cargoModal.classList.add('active'); renderCargoList(); }
-  function closeCargoModal(){ if(window.BiofirmAnimations) window.BiofirmAnimations.closeModalAnimated(cargoModal); else cargoModal.classList.remove('active'); const n=document.getElementById('cargoNome'); if(n) n.value=''; const s=document.getElementById('cargoSetor'); if(s) s.value=''; const sal=document.getElementById('cargoSalario'); if(sal){ sal.value=''; delete sal.dataset.editId; } }
+  function openCargoModal(){ if(!canManageCargos){ alert('Seu perfil não permite gerenciar cargos.'); return; } if(window.BiofirmeAnimations) window.BiofirmeAnimations.openModalAnimated(cargoModal); else cargoModal.classList.add('active'); renderCargoList(); }
+  function closeCargoModal(){ if(window.BiofirmeAnimations) window.BiofirmeAnimations.closeModalAnimated(cargoModal); else cargoModal.classList.remove('active'); const n=document.getElementById('cargoNome'); if(n) n.value=''; const s=document.getElementById('cargoSetor'); if(s) s.value=''; const sal=document.getElementById('cargoSalario'); if(sal){ sal.value=''; delete sal.dataset.editId; } }
   if(btnManageCargos) btnManageCargos.addEventListener('click', openCargoModal);
   if(navCargos) navCargos.addEventListener('click', function(e){ e.preventDefault(); openCargoModal(); });
   if(btnCloseCargoModal) btnCloseCargoModal.addEventListener('click', closeCargoModal);
@@ -829,15 +829,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     const editId = salEl && salEl.dataset.editId ? salEl.dataset.editId : null;
     try{
       if(editId){
-        await BiofirmAPI.positions.update(editId, { nome, setor: setor||null, salario_base: salarioVal });
+        await BiofirmeAPI.positions.update(editId, { nome, setor: setor||null, salario_base: salarioVal });
       } else {
-        await BiofirmAPI.positions.create({ nome, setor: setor||null, salario_base: salarioVal });
+        await BiofirmeAPI.positions.create({ nome, setor: setor||null, salario_base: salarioVal });
       }
       if(nomeEl) nomeEl.value=''; if(setorEl) setorEl.value=''; if(salEl){ salEl.value=''; delete salEl.dataset.editId; }
       await fetchPositions();
     }catch(err){ alert('Erro ao salvar cargo: '+err.message); }
   });
-  if(document.getElementById('cargoSalario') && window.BiofirmMasks) window.BiofirmMasks.bind(document.getElementById('cargoSalario'),'money');
+  if(document.getElementById('cargoSalario') && window.BiofirmeMasks) window.BiofirmeMasks.bind(document.getElementById('cargoSalario'),'money');
   // Mobile nav — hamburger
   (function(){
     const btn = document.getElementById('btnMobileNav');
@@ -872,7 +872,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       try{
         if(divDocInfo) divDocInfo.textContent='Enviando...';
         const uploaded = await uploadFile(file, 'diversos', empId);
-        await BiofirmAPI.documents.create({ employee_id: Number(empId), tipo, titulo, url: uploaded.url, mime: uploaded.file.type, tamanho_bytes: uploaded.file.size });
+        await BiofirmeAPI.documents.create({ employee_id: Number(empId), tipo, titulo, url: uploaded.url, mime: uploaded.file.type, tamanho_bytes: uploaded.file.size });
         if(divDocFileInput) divDocFileInput.value='';
         if(divDocTituloInput) divDocTituloInput.value='';
         if(divDocInfo) divDocInfo.textContent='Arquivo enviado com sucesso.';
@@ -910,7 +910,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
   async function uploadFile(file, folder, empIdHint){
     if(!file) return null;
-    return BiofirmAPI.uploads.upload(file, folder, empIdHint);
+    return BiofirmeAPI.uploads.upload(file, folder, empIdHint);
   }
   function bindDocInput(fileInput, urlInput, infoId, previewId){
     if(!fileInput) return;
@@ -922,9 +922,9 @@ document.addEventListener('DOMContentLoaded', async function() {
       const previewImg = previewWrap ? previewWrap.querySelector('img') : null;
       try{
         let displayFile = file;
-        if(window.BiofirmCompress){
-          displayFile = await window.BiofirmCompress.compressAndPreview(file, previewImg, infoEl, {maxWidth:1280, quality:0.72});
-          if(previewWrap) previewWrap.style.display = window.BiofirmCompress.isImage(displayFile) ? 'block' : 'none';
+        if(window.BiofirmeCompress){
+          displayFile = await window.BiofirmeCompress.compressAndPreview(file, previewImg, infoEl, {maxWidth:1280, quality:0.72});
+          if(previewWrap) previewWrap.style.display = window.BiofirmeCompress.isImage(displayFile) ? 'block' : 'none';
         } else {
           if(infoEl) infoEl.textContent = file.name;
           if(previewWrap) previewWrap.style.display = 'none';
@@ -957,12 +957,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     if(!file) return;
     try{
       if(fotoInfo) fotoInfo.textContent='Comprimindo...';
-      const compressed = await window.BiofirmCompress.compressAndPreview(file, null, fotoInfo, {maxWidth:800, quality:0.72, maxSizeMB:0.5});
+      const compressed = await window.BiofirmeCompress.compressAndPreview(file, null, fotoInfo, {maxWidth:800, quality:0.72, maxSizeMB:0.5});
       empFotoInput._compressedFile = compressed;
       // também mantém FileList para compatibilidade submit
       const dt = new DataTransfer(); dt.items.add(compressed); empFotoInput.files = dt.files;
       const url = URL.createObjectURL(compressed);
-      if(fotoPreviewWrap){ fotoPreviewWrap.style.backgroundImage=`url(${url})`; fotoPreviewWrap.style.backgroundSize='cover'; if(window.BiofirmAnimations) window.BiofirmAnimations.popFotoPreview(); }
+      if(fotoPreviewWrap){ fotoPreviewWrap.style.backgroundImage=`url(${url})`; fotoPreviewWrap.style.backgroundSize='cover'; if(window.BiofirmeAnimations) window.BiofirmeAnimations.popFotoPreview(); }
     }catch(e){ if(fotoInfo) fotoInfo.textContent='Erro: '+e.message; }
   }
   if(empFotoInput){
@@ -981,11 +981,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     if(fotoVideo) fotoVideo.style.display='block';
     if(btnFotoCapture) btnFotoCapture.style.display='block';
     stopCamera();
-    if (window.BiofirmAnimations) window.BiofirmAnimations.openModalAnimated(fotoChoiceModal);
+    if (window.BiofirmeAnimations) window.BiofirmeAnimations.openModalAnimated(fotoChoiceModal);
     else fotoChoiceModal.classList.add('active');
   }
   function closeFotoChoice(){
-    if (window.BiofirmAnimations) window.BiofirmAnimations.closeModalAnimated(fotoChoiceModal, function(){ stopCamera(); });
+    if (window.BiofirmeAnimations) window.BiofirmeAnimations.closeModalAnimated(fotoChoiceModal, function(){ stopCamera(); });
     else { if(fotoChoiceModal) fotoChoiceModal.classList.remove('active'); stopCamera(); }
   }
   async function startCamera(){
@@ -1142,10 +1142,10 @@ document.addEventListener('DOMContentLoaded', async function() {
       // 3) Persistência
       let savedId = id ? Number(id) : null;
       if (id) {
-        await BiofirmAPI.employees.update(id, payload);
+        await BiofirmeAPI.employees.update(id, payload);
         savedId = Number(id);
       } else {
-        const created = await BiofirmAPI.employees.create(payload);
+        const created = await BiofirmeAPI.employees.create(payload);
         savedId = created ? created.id : null;
       }
       // 4) Envia arquivos diversos pendentes (modo criação) — falhas são informadas ao usuário
@@ -1154,7 +1154,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         for(const pd of pendingDiversos){
           try{
             const uploaded = await uploadFile(pd.file, 'diversos', String(savedId));
-            await BiofirmAPI.documents.create({ employee_id: savedId, tipo: pd.tipo, titulo: pd.titulo, url: uploaded.url, mime: uploaded.file.type, tamanho_bytes: uploaded.file.size });
+            await BiofirmeAPI.documents.create({ employee_id: savedId, tipo: pd.tipo, titulo: pd.titulo, url: uploaded.url, mime: uploaded.file.type, tamanho_bytes: uploaded.file.size });
           }catch(e){ console.error('diversos upload', e); diversosFalhas++; }
         }
         pendingDiversos = [];
@@ -1176,7 +1176,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     if(!canDelete){ alert('Seu perfil não permite excluir cadastros.'); return; }
     if(!confirm('Excluir o cadastro de ' + emp.name + '?\n\nDocumentos e arquivos anexos serão removidos permanentemente.')) return;
     try{
-      await BiofirmAPI.employees.remove(emp.id);
+      await BiofirmeAPI.employees.remove(emp.id);
       if(selectedEmployeeId == emp.id) selectedEmployeeId = null;
       await fetchEmployees();
     }catch(err){ alert('Erro ao excluir: ' + friendlyError(err)); }
@@ -1203,7 +1203,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // busca docs diversos para exibir na ficha
     let diversos = [];
     try{
-      diversos = await BiofirmAPI.documents.list(emp.id);
+      diversos = await BiofirmeAPI.documents.list(emp.id);
     }catch(e){}
     const diversosHtml = diversos.length ? diversos.map(d=> `<div class="ficha-doc-row"><span class="ficha-doc-tag">${d.tipo==='certificado'?'Certificado':d.tipo==='doc_filho'?'Doc. filho':'Outro'}</span> <a href="#" data-doc-ref="${escapeHtml(d.url)}" class="doc-link">${escapeHtml(d.titulo)}</a> <span class="doc-pending">· ${escapeHtml(d.mime||'')}</span></div>`).join('') : '<span class="ficha-doc-empty">Nenhum arquivo diverso.</span>';
     viewContent.innerHTML = `
@@ -1270,7 +1270,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       </div>
     `;
     hydratePhotos(viewContent);
-    if (window.BiofirmAnimations) window.BiofirmAnimations.openModalAnimated(viewModal);
+    if (window.BiofirmeAnimations) window.BiofirmeAnimations.openModalAnimated(viewModal);
     else viewModal.classList.add('active');
   };
 
@@ -1307,7 +1307,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Header dourado
     doc.setFillColor(184,148,60); doc.rect(0,0,pageW,12,'F');
     doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(255,255,255);
-    doc.text('Biofirm', margin, 8);
+    doc.text('Biofirme', margin, 8);
     doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.text('FICHA CADASTRAL DO COLABORADOR', pageW - margin, 8, { align:'right' });
     y = 18;
     // Título + foto
@@ -1389,7 +1389,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
     // arquivos diversos
     let pdfDiversos = [];
-    try{ pdfDiversos = await BiofirmAPI.documents.list(emp.id); }catch(e){}
+    try{ pdfDiversos = await BiofirmeAPI.documents.list(emp.id); }catch(e){}
     section('Arquivos diversos — Certificados / Docs filhos');
     if(pdfDiversos.length===0) row('Arquivos diversos', 'nenhum');
     else {
@@ -1412,7 +1412,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Rodapé
     const footerY = doc.internal.pageSize.getHeight() - 8;
     doc.setFontSize(6); doc.setTextColor(160,150,130);
-    doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')}  ·  Biofirm Gestão de Colaboradores  ·  ${pageW - margin*2}mm`, margin, footerY);
+    doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')}  ·  Biofirme Gestão de Colaboradores  ·  ${pageW - margin*2}mm`, margin, footerY);
     doc.setDrawColor(184,148,60); doc.line(margin, footerY-4, pageW - margin, footerY-4);
 
     const fileName = `Ficha_${(emp.name||'colaborador').replace(/[^a-zA-Z0-9]/g,'_')}_${emp.id}.pdf`;
@@ -1423,7 +1423,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   if(btnPrintFichaBtn) btnPrintFichaBtn.addEventListener('click', exportFichaPDF);
 
   function closeViewModal() {
-    if (window.BiofirmAnimations) window.BiofirmAnimations.closeModalAnimated(viewModal);
+    if (window.BiofirmeAnimations) window.BiofirmeAnimations.closeModalAnimated(viewModal);
     else viewModal.classList.remove('active');
   }
 
@@ -1435,7 +1435,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     if (e.target === employeeModal) closeModal();
     if (e.target === viewModal) closeViewModal();
     if (e.target === fotoChoiceModal) {
-      if (window.BiofirmAnimations) window.BiofirmAnimations.closeModalAnimated(fotoChoiceModal, function(){ if(typeof stopCamera==='function') stopCamera(); });
+      if (window.BiofirmeAnimations) window.BiofirmeAnimations.closeModalAnimated(fotoChoiceModal, function(){ if(typeof stopCamera==='function') stopCamera(); });
       else { fotoChoiceModal.classList.remove('active'); if(typeof stopCamera==='function') stopCamera(); }
     }
   });
@@ -1446,7 +1446,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       if (employeeModal && employeeModal.classList.contains('active')) closeModal();
       if (viewModal && viewModal.classList.contains('active')) closeViewModal();
       if (fotoChoiceModal && fotoChoiceModal.classList.contains('active')) {
-        if (window.BiofirmAnimations) window.BiofirmAnimations.closeModalAnimated(fotoChoiceModal, function(){ if(typeof stopCamera==='function') stopCamera(); });
+        if (window.BiofirmeAnimations) window.BiofirmeAnimations.closeModalAnimated(fotoChoiceModal, function(){ if(typeof stopCamera==='function') stopCamera(); });
         else fotoChoiceModal.classList.remove('active');
       }
     }
@@ -1470,7 +1470,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     if(e.key==='Escape'){
       const cargoModalEl=document.getElementById('cargoModal');
       if(cargoModalEl && cargoModalEl.classList.contains('active')){
-        if(window.BiofirmAnimations) window.BiofirmAnimations.closeModalAnimated(cargoModalEl);
+        if(window.BiofirmeAnimations) window.BiofirmeAnimations.closeModalAnimated(cargoModalEl);
         else cargoModalEl.classList.remove('active');
       }
     }
@@ -1478,7 +1478,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   window.addEventListener('click', function(e){
     const cargoModalEl=document.getElementById('cargoModal');
     if(e.target===cargoModalEl){
-      if(window.BiofirmAnimations) window.BiofirmAnimations.closeModalAnimated(cargoModalEl);
+      if(window.BiofirmeAnimations) window.BiofirmeAnimations.closeModalAnimated(cargoModalEl);
       else cargoModalEl.classList.remove('active');
     }
   });

@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const form = document.getElementById('loginForm');
   if (!form) return;
 
-  function getAnim() { return window.BiofirmAnimations; }
+  function getAnim() { return window.BiofirmeAnimations; }
 
   form.addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -25,8 +25,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (Anim) Anim.loginButtonLoading(true);
     try {
-      const data = await BiofirmAPI.auth.login(username, password);
-      sessionStorage.setItem('biofirm_user', JSON.stringify(data.user));
+      const data = await BiofirmeAPI.auth.login(username, password);
+      sessionStorage.setItem('biofirme_user', JSON.stringify(data.user));
       // Transição de saída sutil antes de navegar - com guard defensivo
       if (typeof gsap !== 'undefined' && Anim && Anim.prefersReducedMotion && !Anim.prefersReducedMotion()) {
         var card = document.querySelector('.login-card');

@@ -1,5 +1,5 @@
 -- ============================================================================
--- Biofirm Gestor — Migration 0001 (baseline: schema + RLS + storage)
+-- Biofirme Gestor — Migration 0001 (baseline: schema + RLS + storage)
 -- ----------------------------------------------------------------------------
 -- COMO APLICAR:
 --   Projeto NOVO:      supabase db push   (ou cole no SQL Editor do painel)

@@ -1,4 +1,4 @@
-# 🗺️ Cronograma & Roadmap de Desenvolvimento — Biofirm
+# 🗺️ Cronograma & Roadmap de Desenvolvimento — Biofirme
 
 > **Sistema de Cadastro e Gestão de Colaboradores**  
 > Documento de rastreabilidade, status de entregas e planejamento de próximas etapas com base no [PRD.md](file:///c:/Biofirme/PRD.md) e requisitos operacionais.  
@@ -12,7 +12,7 @@
 
 ```mermaid
 gantt
-    title Cronograma de Entregas - Biofirm
+    title Cronograma de Entregas - Biofirme
     dateFormat  YYYY-MM-DD
     section Fase 1: Fundação
     PRD e Modelagem de Dados      :done, des1, 2026-08-20, 2026-08-22
@@ -60,7 +60,7 @@ gantt
 - ✅ PRD completo com requisitos funcionais e não-funcionais
 - ✅ Modelagem inicial do banco de dados (Supabase PostgreSQL)
 - ✅ Design System: tipografia (Playfair Display + Inter + JetBrains Mono), paleta de cores, componentes base
-- ✅ Tela de login com identidade visual Biofirm
+- ✅ Tela de login com identidade visual Biofirme
 
 ### Stack Inicial
 - Frontend: HTML5 + CSS3 + JavaScript vanilla
@@ -141,8 +141,8 @@ gantt
   - Índices em `pis_pasep`, `ctps_numero` além de cpf/setor/status/name/email/cep
 
 ### Usuários de Teste Criados
-- **admin.teste@biofirm.local** / `senha123` (role: admin)
-- **gestor.biofirm@biofirm.local** / `gestor123` (role: gestor)
+- **admin.teste@biofirme.local** / `senha123` (role: admin)
+- **gestor.biofirme@biofirme.local** / `gestor123` (role: gestor)
 
 ---
 
@@ -210,7 +210,7 @@ gantt
 - ✅ **Neon Postgres**: projeto `biofirme`, branch `production`, PostgreSQL 18. Schema único em `db/schema.sql`, aplicado com `npm run db:migrate`. Banco iniciado vazio.
 - ✅ **API serverless** em `api/` (Vercel Functions): `auth`, `employees`, `positions`, `documents`, `uploads`, `files`, `health` + helpers em `api/_lib/` (`http`, `db`, `auth`, `storage`, `validate`).
 - ✅ **Autenticação própria**: `profiles.password_hash` com bcrypt (custo 12), JWT assinado com `AUTH_SECRET` em cookie `httpOnly; SameSite=Lax; Secure`. Validação server-side no carregamento do dashboard. RBAC nas APIs.
-- ✅ **Usuários seed**: `marcus.rolim` e `gestor.biofirm` (ambos admin, senha definida via `.env.local`).
+- ✅ **Usuários seed**: `marcus.rolim` e `gestor.biofirme` (ambos admin, senha definida via `.env.local`).
 - ✅ **Neon Object Storage**: bucket privado `biofirme`, URL presigned de PUT (`/api/uploads`) e redirect assinado de GET (`/api/files?key=`). CORS configurado por `npm run storage:setup`.
 - ✅ **Remoção completa do Supabase**: SDK e `js/supabase.js` removidos; `js/api.js` adicionado; HTML atualizado; nenhuma credencial versionada.
 - ✅ **Compressão**: imagens (canvas → WebP/JPEG) e PDFs (pdf.js + jsPDF no cliente, com preservação do original se não houver economia). CLI `npm run compress` com modos `auto`/`lossless`/`raster` (auto: lossless primeiro, raster se economia < 15%).
@@ -221,7 +221,7 @@ gantt
 | Usuário | Role |
 |---------|------|
 | `marcus.rolim` | admin |
-| `gestor.biofirm` | admin |
+| `gestor.biofirme` | admin |
 
 Senhas definidas em `.env.local`, nunca versionadas.
 
@@ -294,5 +294,5 @@ npm run compress -- <arquivo|pasta> --pdf-mode auto
 
 ---
 
-**Documento mantido por:** Equipe Biofirm  
+**Documento mantido por:** Equipe Biofirme
 **Contato:** [adicionar contato se necessário]

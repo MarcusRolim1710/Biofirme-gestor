@@ -4,8 +4,8 @@
 -- Este arquivo apenas documenta o que o seed faz.
 -- ============================================================
 --
--- marcus.rolim  / marcus.rolim@biofirm.local  / admin
--- gestor.biofirm / gestor.biofirm@biofirm.local / admin
+-- marcus.rolim  / marcus.rolim@biofirme.local  / admin
+-- gestor.biofirme / gestor.biofirme@biofirme.local / admin
 --
 -- Senhas definidas em .env.local (SEED_PASSWORD_MARCUS / SEED_PASSWORD_GESTOR)
 -- ou geradas aleatoriamente e exibidas uma unica vez.

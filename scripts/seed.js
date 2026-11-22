@@ -20,13 +20,13 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const USERS = [
   {
     username: 'marcus.rolim',
-    email: 'marcus.rolim@biofirm.local',
+    email: 'marcus.rolim@biofirme.local',
     role: 'admin',
     passwordEnv: 'SEED_PASSWORD_MARCUS',
   },
   {
-    username: 'gestor.biofirm',
-    email: 'gestor.biofirm@biofirm.local',
+    username: 'gestor.biofirme',
+    email: 'gestor.biofirme@biofirme.local',
     role: 'admin',
     passwordEnv: 'SEED_PASSWORD_GESTOR',
   },

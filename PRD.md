@@ -1,9 +1,9 @@
-# PRD - Sistema de Cadastro de Funcionários - Biofirm
+# PRD - Sistema de Cadastro de Funcionários - Biofirme
 
 **Última atualização:** 22/11/2026 — Migração para Neon Postgres + Neon Object Storage, autenticação própria e compressão de imagens/PDFs.
 
 ## 1. Visão Geral
-Sistema web para centralizar, armazenar e gerenciar o cadastro de funcionários da Biofirm, substituindo o uso de WhatsApp, documentos .docx e imagens soltas. Objetivo: rastreabilidade, segurança e agilidade na consulta e entrega de dados à contabilidade.
+Sistema web para centralizar, armazenar e gerenciar o cadastro de funcionários da Biofirme, substituindo o uso de WhatsApp, documentos .docx e imagens soltas. Objetivo: rastreabilidade, segurança e agilidade na consulta e entrega de dados à contabilidade.
 
 ### Arquitetura Atual
 - **Frontend:** HTML5 + CSS3 + JavaScript vanilla (sem frameworks)
@@ -107,8 +107,8 @@ Fonte da verdade: `db/schema.sql` (aplicável com `npm run db:migrate`).
 ### Usuários iniciais (seed)
 | Usuário | Email | Role |
 |---------|-------|------|
-| `marcus.rolim` | `marcus.rolim@biofirm.local` | admin |
-| `gestor.biofirm` | `gestor.biofirm@biofirm.local` | admin |
+| `marcus.rolim` | `marcus.rolim@biofirme.local` | admin |
+| `gestor.biofirme` | `gestor.biofirme@biofirme.local` | admin |
 
 Criados/atualizados por `npm run db:seed`, com senhas lidas de `.env.local` (`SEED_PASSWORD_MARCUS`, `SEED_PASSWORD_GESTOR`) — nunca versionadas. Banco iniciado vazio, sem migração de dados antigos.
 
@@ -222,5 +222,5 @@ npm run compress -- <arquivo|pasta> --pdf-mode auto
 
 ---
 
-**Documento mantido por:** Equipe Biofirm
+**Documento mantido por:** Equipe Biofirme
 **Versão:** 3.0 (Neon Postgres + Object Storage, auth própria, compressão de imagens e PDFs)

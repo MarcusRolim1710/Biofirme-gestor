@@ -49,7 +49,7 @@
     try {
       await request('/api/auth?action=logout', { method: 'POST' });
     } finally {
-      sessionStorage.removeItem('biofirm_user');
+      sessionStorage.removeItem('biofirme_user');
     }
   }
 
@@ -84,8 +84,8 @@
     if (!file) return null;
 
     let prepared = file;
-    if (global.BiofirmCompress && global.BiofirmCompress.compressFile) {
-      prepared = await global.BiofirmCompress.compressFile(file, { onProgress });
+    if (global.BiofirmeCompress && global.BiofirmeCompress.compressFile) {
+      prepared = await global.BiofirmeCompress.compressFile(file, { onProgress });
     }
 
     const maxBytes = 10 * 1024 * 1024;
@@ -118,7 +118,7 @@
     return { url: presign.url, key: presign.key, file: prepared };
   }
 
-  global.BiofirmAPI = {
+  global.BiofirmeAPI = {
     request,
     auth: { login, logout, me },
     employees,

@@ -1,5 +1,5 @@
 -- ============================================================================
--- Biofirm Gestor — RLS + Triggers + Storage (aplicar em projeto EXISTENTE)
+-- Biofirme Gestor — RLS + Triggers + Storage (aplicar em projeto EXISTENTE)
 -- Cole TODO este arquivo no SQL Editor do Supabase e execute (Run).
 -- Idempotente: pode rodar mais de uma vez sem erro.
 -- ============================================================================

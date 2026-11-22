@@ -138,7 +138,7 @@
     });
   }
 
-  global.BiofirmMasks = {
+  global.BiofirmeMasks = {
     onlyDigits: onlyDigits,
     apply: applyMask,
     bind: attach,

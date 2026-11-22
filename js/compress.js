@@ -235,7 +235,7 @@
     return compressed;
   }
 
-  global.BiofirmCompress = {
+  global.BiofirmeCompress = {
     compressImage,
     compressPdf,
     compressFile,

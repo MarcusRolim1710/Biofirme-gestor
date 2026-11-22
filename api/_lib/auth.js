@@ -3,7 +3,7 @@
 const jwt = require('jsonwebtoken');
 const { parseCookies, serializeCookie, fail } = require('./http');
 
-const COOKIE_NAME = 'biofirm_session';
+const COOKIE_NAME = 'biofirme_session';
 const SESSION_SECONDS = 60 * 60 * 8; // 8 horas
 const ISSUER = 'biofirme';
 

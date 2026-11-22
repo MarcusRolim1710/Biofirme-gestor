@@ -384,7 +384,7 @@
   }
 
   // Expor API global
-  global.BiofirmAnimations = {
+  global.BiofirmeAnimations = {
     initLogin: initLogin,
     shakeLoginCard: shakeLoginCard,
     loginButtonLoading: loginButtonLoading,

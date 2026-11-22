@@ -50,7 +50,7 @@ Criados com `npm run db:seed` (senhas definidas em `.env.local`, nunca versionad
 | Usuário | Perfil |
 |---------|--------|
 | `marcus.rolim` | admin |
-| `gestor.biofirm` | admin |
+| `gestor.biofirme` | admin |
 
 ## Setup do banco e storage
 
