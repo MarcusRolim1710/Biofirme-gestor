@@ -3,6 +3,8 @@ node_modules/
 
 # Env - NAO subir chaves secretas
 .env
+.env.*
+!.env.example
 
 # OS
 .DS_Store
@@ -10,3 +12,8 @@ Thumbs.db
 
 # Vercel
 .vercel
+
+# Build / saida de scripts
+compressed/
+dist/
+*.log

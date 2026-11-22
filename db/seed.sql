@@ -1,0 +1,11 @@
+-- ============================================================
+-- Biofirme - Seed de referencia
+-- Os usuarios sao criados por scripts/seed.js (bcrypt).
+-- Este arquivo apenas documenta o que o seed faz.
+-- ============================================================
+--
+-- marcus.rolim  / marcus.rolim@biofirm.local  / admin
+-- gestor.biofirm / gestor.biofirm@biofirm.local / admin
+--
+-- Senhas definidas em .env.local (SEED_PASSWORD_MARCUS / SEED_PASSWORD_GESTOR)
+-- ou geradas aleatoriamente e exibidas uma unica vez.

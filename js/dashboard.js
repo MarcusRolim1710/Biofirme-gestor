@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
   // 0. Formatadores
   function formatCPF(value) {
     const d = (value || '').replace(/\D+/g, '');
@@ -30,9 +30,14 @@ document.addEventListener('DOMContentLoaded', function() {
     return parts.join(' · ');
   }
 
-  // 1. Verificação de Sessão
-  const userData = JSON.parse(sessionStorage.getItem('biofirm_user') || 'null');
-  if (!userData) {
+  // 1. Verificação de Sessão (validada no servidor)
+  let userData = null;
+  try {
+    const session = await BiofirmAPI.auth.me();
+    userData = session.user;
+    sessionStorage.setItem('biofirm_user', JSON.stringify(userData));
+  } catch (err) {
+    sessionStorage.removeItem('biofirm_user');
     window.location.href = 'index.html';
     return;
   }
@@ -50,7 +55,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async function() {
-      await logout();
+      await BiofirmAPI.auth.logout();
       window.location.href = 'index.html';
     });
   }
@@ -142,9 +147,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // 2a. Cargos com salário fixo
   async function fetchPositions(){
     try{
-      const { data, error } = await supabaseClient.from('positions').select('*').order('nome');
-      if(error) throw error;
-      positions = data || [];
+      positions = await BiofirmAPI.positions.list();
       renderCargoSelect();
       renderCargoList();
     }catch(err){ console.error('positions', err); }
@@ -182,8 +185,10 @@ document.addEventListener('DOMContentLoaded', function() {
     wrap.querySelectorAll('[data-cargo-del]').forEach(btn=> btn.addEventListener('click', async ()=> {
       const id = btn.getAttribute('data-cargo-del');
       if(!confirm('Excluir este cargo? Funcionários vinculados ficarão sem cargo_id mas mantêm cargo/salário atuais.')) return;
-      const { error } = await supabaseClient.from('positions').delete().eq('id', id);
-      if(error) alert('Erro: '+error.message); else await fetchPositions();
+      try{
+        await BiofirmAPI.positions.remove(id);
+        await fetchPositions();
+      }catch(err){ alert('Erro: '+err.message); }
     }));
   }
   function syncSalarioFromCargo(){
@@ -202,8 +207,12 @@ document.addEventListener('DOMContentLoaded', function() {
   // 2b. Arquivos diversos
   async function fetchDiversos(employeeId){
     if(!employeeId) { employeeDiversos=[]; renderDiversosList(); return; }
-    const { data, error } = await supabaseClient.from('employee_documents').select('*').eq('employee_id', employeeId).order('created_at');
-    if(error){ console.error(error); employeeDiversos=[]; } else employeeDiversos = data||[];
+    try{
+      employeeDiversos = await BiofirmAPI.documents.list(employeeId);
+    }catch(err){
+      console.error(err);
+      employeeDiversos = [];
+    }
     renderDiversosList();
   }
   function renderDiversosList(){
@@ -234,8 +243,10 @@ document.addEventListener('DOMContentLoaded', function() {
           renderDiversosList();
         } else {
           if(!confirm('Remover este arquivo diverso?')) return;
-          const { error } = await supabaseClient.from('employee_documents').delete().eq('id', v);
-          if(error) alert('Erro: '+error.message); else await fetchDiversos(employeeDiversos[0]? employeeDiversos[0].employee_id : null);
+          try{
+            await BiofirmAPI.documents.remove(v);
+            await fetchDiversos(employeeDiversos[0]? employeeDiversos[0].employee_id : null);
+          }catch(err){ alert('Erro: '+err.message); }
         }
       });
     });
@@ -244,12 +255,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // 2. Carregar Dados da API
   async function fetchEmployees() {
     try {
-      const { data, error } = await supabaseClient
-        .from('employees')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      employees = data || [];
+      employees = await BiofirmAPI.employees.list();
       render();
     } catch (err) {
       console.error(err);
@@ -376,8 +382,7 @@ document.addEventListener('DOMContentLoaded', function() {
           else if(action==='delete'){
             if(confirm(`Deseja realmente excluir o cadastro de ${empItem.name}?`)){
               try{
-                const { error } = await supabaseClient.from('employees').delete().eq('id', id);
-                if(error) throw error;
+                await BiofirmAPI.employees.remove(id);
                 if(selectedEmployeeId == id) selectedEmployeeId=null;
                 await fetchEmployees();
               }catch(err){ alert('Erro ao excluir: '+err.message); }
@@ -782,11 +787,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const editId = salEl && salEl.dataset.editId ? salEl.dataset.editId : null;
     try{
       if(editId){
-        const { error } = await supabaseClient.from('positions').update({ nome, setor: setor||null, salario_base: salarioVal }).eq('id', editId);
-        if(error) throw error;
+        await BiofirmAPI.positions.update(editId, { nome, setor: setor||null, salario_base: salarioVal });
       } else {
-        const { error } = await supabaseClient.from('positions').insert({ nome, setor: setor||null, salario_base: salarioVal });
-        if(error) throw error;
+        await BiofirmAPI.positions.create({ nome, setor: setor||null, salario_base: salarioVal });
       }
       if(nomeEl) nomeEl.value=''; if(setorEl) setorEl.value=''; if(salEl){ salEl.value=''; delete salEl.dataset.editId; }
       await fetchPositions();
@@ -826,13 +829,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if(empId){
       try{
         if(divDocInfo) divDocInfo.textContent='Enviando...';
-        let toUpload = file;
-        if(window.BiofirmCompress && file.type.startsWith('image/')){
-          try{ toUpload = await window.BiofirmCompress.compressImage(file, { maxWidth:1280, quality:0.72 }); }catch(e){ toUpload=file; }
-        }
-        const url = await uploadFile(toUpload, 'diversos', empId);
-        const { error } = await supabaseClient.from('employee_documents').insert({ employee_id: Number(empId), tipo, titulo, url, mime: toUpload.type, tamanho_bytes: toUpload.size });
-        if(error) throw error;
+        const uploaded = await uploadFile(file, 'diversos', empId);
+        await BiofirmAPI.documents.create({ employee_id: Number(empId), tipo, titulo, url: uploaded.url, mime: uploaded.file.type, tamanho_bytes: uploaded.file.size });
         if(divDocFileInput) divDocFileInput.value='';
         if(divDocTituloInput) divDocTituloInput.value='';
         if(divDocInfo) divDocInfo.textContent='Arquivo enviado com sucesso.';
@@ -840,11 +838,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }catch(err){ if(divDocInfo) divDocInfo.textContent='Erro: '+err.message; alert('Erro ao enviar: '+err.message); }
     } else {
       // modo criação — fila pendente, será enviado após criar funcionário
-      let compressed = file;
-      if(window.BiofirmCompress && file.type.startsWith('image/')){
-        try{ compressed = await window.BiofirmCompress.compressImage(file, { maxWidth:1280, quality:0.72 }); }catch(e){ compressed=file; }
-      }
-      pendingDiversos.push({ tipo, titulo, file: compressed, origName: file.name });
+      pendingDiversos.push({ tipo, titulo, file, origName: file.name });
       if(divDocFileInput) divDocFileInput.value='';
       if(divDocTituloInput) divDocTituloInput.value='';
       if(divDocInfo) divDocInfo.textContent='Adicionado à fila — será enviado ao salvar o funcionário.';
@@ -852,23 +846,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
-  // Upload helpers com compressão (economia 1GB)
-  const BUCKET = 'employee-docs';
-  async function ensureBucket(){ /* bucket criado via SQL, ignora erro */ }
+  // Upload helpers — compressao + presigned URL do Neon Object Storage
   async function uploadFile(file, folder, empIdHint){
     if(!file) return null;
-    let toUpload = file;
-    if(window.BiofirmCompress && file.type.startsWith('image/')){
-      try { toUpload = await window.BiofirmCompress.compressImage(file, { maxWidth: 1280, quality: 0.72 }); } catch(e){ toUpload=file; }
-    }
-    if(toUpload.size > 10*1024*1024){ throw new Error('Arquivo excede 10MB: '+file.name); }
-    const ext = toUpload.name.split('.').pop() || 'bin';
-    const safeFolder = folder.replace(/[^a-z0-9_-]/gi,'');
-    const key = `${safeFolder}/${empIdHint||'tmp'}_${Date.now()}_${Math.random().toString(36).slice(2,6)}.${ext}`;
-    const { error } = await supabaseClient.storage.from(BUCKET).upload(key, toUpload, { cacheControl:'3600', upsert:false, contentType: toUpload.type });
-    if(error) throw error;
-    const { data } = supabaseClient.storage.from(BUCKET).getPublicUrl(key);
-    return data.publicUrl;
+    return BiofirmAPI.uploads.upload(file, folder, empIdHint);
   }
   function bindDocInput(fileInput, urlInput, infoId, previewId){
     if(!fileInput) return;
@@ -879,14 +860,13 @@ document.addEventListener('DOMContentLoaded', function() {
       const previewWrap = document.getElementById(previewId);
       const previewImg = previewWrap ? previewWrap.querySelector('img') : null;
       try{
-        if(infoEl) infoEl.textContent = 'Comprimindo...';
         let displayFile = file;
-        if(window.BiofirmCompress && file.type.startsWith('image/')){
+        if(window.BiofirmCompress){
           displayFile = await window.BiofirmCompress.compressAndPreview(file, previewImg, infoEl, {maxWidth:1280, quality:0.72});
-          if(previewWrap) previewWrap.style.display='block';
+          if(previewWrap) previewWrap.style.display = window.BiofirmCompress.isImage(displayFile) ? 'block' : 'none';
         } else {
-          if(infoEl) infoEl.textContent = window.BiofirmCompress ? window.BiofirmCompress.formatBytes(file.size) + ' (PDF)' : file.name;
-          if(previewWrap) previewWrap.style.display='none';
+          if(infoEl) infoEl.textContent = file.name;
+          if(previewWrap) previewWrap.style.display = 'none';
         }
         // guarda File para upload no submit (via dataset)
         fileInput._compressedFile = displayFile;
@@ -1022,8 +1002,8 @@ document.addEventListener('DOMContentLoaded', function() {
       // foto
       if(empFotoInput && empFotoInput.files[0]){
         const f = empFotoInput._compressedFile || empFotoInput.files[0];
-        const url = await uploadFile(f, 'foto', hint);
-        if(url && empFotoUrlInput) empFotoUrlInput.value = url;
+        const uploaded = await uploadFile(f, 'foto', hint);
+        if(uploaded && empFotoUrlInput) empFotoUrlInput.value = uploaded.url;
       }
       const uploads = [
         [empRgFrenteInput, empRgFrenteUrlInput, 'rg_frente'],
@@ -1035,8 +1015,8 @@ document.addEventListener('DOMContentLoaded', function() {
       for(const [fin, urlIn, folder] of uploads){
         if(fin && fin.files[0]){
           const f = fin._compressedFile || fin.files[0];
-          const url = await uploadFile(f, folder, hint);
-          if(url && urlIn) urlIn.value = url;
+          const uploaded = await uploadFile(f, folder, hint);
+          if(uploaded && urlIn) urlIn.value = uploaded.url;
         }
       }
 
@@ -1068,7 +1048,7 @@ document.addEventListener('DOMContentLoaded', function() {
       };
       // se cargo_id presente, não precisa enviar cargo texto (trigger seta), mas mantém compat
       if(cargoIdVal){
-        const pos = positions.find(p=> p.id===cargoIdVal);
+        const pos = positions.find(p=> String(p.id)===String(cargoIdVal));
         if(pos) payload.cargo = pos.nome;
       } else {
         payload.cargo = null;
@@ -1099,28 +1079,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
       let savedId = id ? Number(id) : null;
       if (id) {
-        const { error } = await supabaseClient
-          .from('employees')
-          .update(payload)
-          .eq('id', id);
-        if (error) throw error;
+        await BiofirmAPI.employees.update(id, payload);
         savedId = Number(id);
       } else {
-        const { data, error } = await supabaseClient
-          .from('employees')
-          .insert(payload)
-          .select('id')
-          .single();
-        if (error) throw error;
-        savedId = data ? data.id : null;
+        const created = await BiofirmAPI.employees.create(payload);
+        savedId = created ? created.id : null;
       }
       // envia arquivos diversos pendentes (modo criação)
       if(pendingDiversos.length>0 && savedId){
         for(const pd of pendingDiversos){
           try{
-            const url = await uploadFile(pd.file, 'diversos', String(savedId));
-            const { error } = await supabaseClient.from('employee_documents').insert({ employee_id: savedId, tipo: pd.tipo, titulo: pd.titulo, url, mime: pd.file.type, tamanho_bytes: pd.file.size });
-            if(error) console.error('diversos insert', error);
+            const uploaded = await uploadFile(pd.file, 'diversos', String(savedId));
+            await BiofirmAPI.documents.create({ employee_id: savedId, tipo: pd.tipo, titulo: pd.titulo, url: uploaded.url, mime: uploaded.file.type, tamanho_bytes: uploaded.file.size });
           }catch(e){ console.error('diversos upload', e); }
         }
         pendingDiversos = [];
@@ -1153,11 +1123,7 @@ document.addEventListener('DOMContentLoaded', function() {
     } else if (action === 'delete') {
       if (confirm(`Deseja realmente excluir o cadastro de ${emp.name}?`)) {
         try {
-          const { error } = await supabaseClient
-            .from('employees')
-            .delete()
-            .eq('id', id);
-          if (error) throw error;
+          await BiofirmAPI.employees.remove(id);
           if (selectedEmployeeId == id) selectedEmployeeId = null;
           await fetchEmployees();
         } catch (err) {
@@ -1188,8 +1154,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // busca docs diversos para exibir na ficha
     let diversos = [];
     try{
-      const { data } = await supabaseClient.from('employee_documents').select('*').eq('employee_id', emp.id).order('created_at');
-      diversos = data || [];
+      diversos = await BiofirmAPI.documents.list(emp.id);
     }catch(e){}
     const diversosHtml = diversos.length ? diversos.map(d=> `<div style="font-size:11px; padding:4px 0; border-bottom:1px solid #F0E6CE;"><span style="background:var(--color-gold-light); padding:1px 5px; font-size:10px;">${d.tipo==='certificado'?'Certificado':d.tipo==='doc_filho'?'Doc. filho':'Outro'}</span> <a href="${d.url}" target="_blank" style="color:var(--color-info); text-decoration:underline;">${d.titulo}</a> <span style="color:var(--color-text-muted);">· ${d.mime||''}</span></div>`).join('') : '<span style="color:var(--color-text-muted); font-size:11px;">Nenhum arquivo diverso.</span>';
     viewContent.innerHTML = `
@@ -1373,7 +1338,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     // arquivos diversos
     let pdfDiversos = [];
-    try{ const { data } = await supabaseClient.from('employee_documents').select('*').eq('employee_id', emp.id).order('created_at'); pdfDiversos = data||[]; }catch(e){}
+    try{ pdfDiversos = await BiofirmAPI.documents.list(emp.id); }catch(e){}
     section('Arquivos diversos — Certificados / Docs filhos');
     if(pdfDiversos.length===0) row('Arquivos diversos', 'nenhum');
     else pdfDiversos.forEach(d=>{ row((d.tipo==='certificado'?'Certificado': d.tipo==='doc_filho'?'Doc. filho':'Outro')+' — '+d.titulo, d.url || '-'); });

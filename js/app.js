@@ -23,11 +23,9 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
 
-    const email = username.includes('@') ? username : `${username}@biofirm.local`;
-
     if (Anim) Anim.loginButtonLoading(true);
     try {
-      const data = await login(email, password);
+      const data = await BiofirmAPI.auth.login(username, password);
       sessionStorage.setItem('biofirm_user', JSON.stringify(data.user));
       // Transição de saída sutil antes de navegar - com guard defensivo
       if (typeof gsap !== 'undefined' && Anim && Anim.prefersReducedMotion && !Anim.prefersReducedMotion()) {

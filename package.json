@@ -1,16 +1,33 @@
 {
   "name": "biofirme",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Biofirme Gestor - cadastro de funcionarios (Neon Postgres + Object Storage)",
+  "type": "commonjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node scripts/dev-server.js",
+    "db:migrate": "node scripts/migrate.js",
+    "db:seed": "node scripts/seed.js",
+    "storage:setup": "node scripts/setup-storage.js",
+    "compress": "node scripts/compress.js",
+    "test": "node scripts/smoke-test.js"
   },
   "keywords": [],
-  "author": "",
+  "author": "Marcus Rolim",
   "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "@supabase/supabase-js": "^2.112.4"
+    "@aws-sdk/client-s3": "^3.1175.0",
+    "@aws-sdk/s3-request-presigner": "^3.1175.0",
+    "@neondatabase/serverless": "^1.2.1",
+    "bcryptjs": "^3.0.3",
+    "jsonwebtoken": "^9.0.3"
+  },
+  "devDependencies": {
+    "@napi-rs/canvas": "^1.2.0",
+    "dotenv": "^18.0.10",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.5.438",
+    "pg": "^8.23.1",
+    "sharp": "^0.35.5"
   }
 }
