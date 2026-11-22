@@ -39,7 +39,10 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (err) {
       var AnimErr = getAnim();
       if (AnimErr) { AnimErr.loginButtonLoading(false); AnimErr.shakeLoginCard(); }
-      alert(err.message || 'Erro de conexão com o banco de dados.');
+      var msg = (err && err.message) || '';
+      if (/invalido|invali|401/i.test(msg)) msg = 'Usuário ou senha inválidos.';
+      else if (!msg) msg = 'Erro de conexão com o servidor.';
+      alert(msg);
     }
   });
 
